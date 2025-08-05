@@ -1,21 +1,19 @@
 /*
-  Client‑side logic for the Grow a Garden mutation calculator.
-  On page load we generate a list of mutation checkboxes in the same
-  order they appear on the in‑game fruit tooltip.  When the form is
-  submitted we compute the weighted crop value, mutation multiplier and
-  total price using the formula from the Grow a Garden Wiki:
+  Client-side logic for the modified Grow a Garden mutation calculator.
 
-      MutationMultiplier = Growth × (1 + ΣMutations − MutationCount)
-      CropValue         = BaseValue × (Weight / BaseWeight)²
-      TotalPrice        = CropValue × MutationMultiplier × Quantity
+  In addition to the original functionality (mutation selection and value
+  computation), this version introduces a crop selection search at the top
+  of the form.  A list of crop names is displayed and can be filtered
+  by typing in the search box.  Clicking on a crop highlights it.  The
+  selected crop is not currently used in any calculations but is exposed
+  for future enhancements.
 
-  The mutation data originates from the MutationHandler script in
-  Grow a Garden and was assembled manually after extracting the in‑game
-  display order.  See index.html for more details.
+  Environmental mutation data originates from the MutationHandler script
+  in Grow a Garden and is ordered according to the in–game display order.
 */
 
-// Ordered list of all environmental mutations.  Growth mutations
-// (Golden and Rainbow) are handled separately in the <select> element.
+// Ordered list of all environmental mutations.  Growth mutations (Golden and
+// Rainbow) are handled separately in the <select> element.
 const mutationOrder = [
   "Eclipsed",
   "Meteoric",
@@ -84,8 +82,8 @@ const mutationOrder = [
   "Acidic",
 ];
 
-// Multipliers for each environmental mutation.  Missing values default
-// to 1× (meaning no effect).  Growth mutations are not listed here.
+// Multipliers for each environmental mutation.  Missing values default to
+// 1× (meaning no effect).  Growth mutations are not listed here.
 const mutationMultipliers = {
   Eclipsed: 30,
   Meteoric: 125,
@@ -155,11 +153,37 @@ const mutationMultipliers = {
 };
 
 /**
- * Initialise the mutation list when the DOM is ready.
+ * List of crops to display in the crop selection area.  This is a small
+ * representative subset drawn from Grow a Garden.  In future versions this
+ * list could be expanded or generated dynamically.
+ */
+const crops = [
+  "Aloe Vera",
+  "Amber Spine",
+  "Apple",
+  "Artichoke",
+  "Avocado",
+  "Bamboo",
+  "Banana",
+  "Beanstalk",
+  "Bee Balm",
+  "Bell Pepper",
+  "Bendboo",
+  "Blood Banana",
+  "Blueberry",
+  "Bone Blossom",
+  "Boneboo",
+  "Burning Bud",
+  "Cacao",
+  "Cactus",
+];
+
+/**
+ * Initialise the mutation list when the DOM is ready.  Generates a checkbox
+ * for each mutation in order.
  */
 function initMutations() {
   const container = document.getElementById("mutations");
-  // Create a checkbox for each mutation in order
   mutationOrder.forEach((name) => {
     const id = `mut-${name}`;
     const label = document.createElement("label");
@@ -180,6 +204,46 @@ function initMutations() {
 }
 
 /**
+ * Initialise the crop list and search box.  Renders buttons for each crop
+ * and filters them as the user types.  Selecting a crop highlights it.
+ */
+function initCrops() {
+  const listEl = document.getElementById("cropList");
+  const searchEl = document.getElementById("cropSearch");
+  let selected = null;
+
+  function render(filter = "") {
+    listEl.innerHTML = "";
+    const lowerFilter = filter.trim().toLowerCase();
+    const filtered = crops.filter((c) =>
+      c.toLowerCase().includes(lowerFilter)
+    );
+    filtered.forEach((name) => {
+      const div = document.createElement("div");
+      div.className = "crop-item";
+      div.textContent = name;
+      div.addEventListener("click", () => {
+        // Deselect previous selection
+        if (selected) {
+          selected.classList.remove("selected");
+        }
+        div.classList.add("selected");
+        selected = div;
+        // Additional logic could be added here, for example auto-filling
+        // base values for the selected crop.
+      });
+      listEl.appendChild(div);
+    });
+  }
+  // Initial render
+  render();
+  // Filter on input
+  searchEl.addEventListener("input", (e) => {
+    render(e.target.value);
+  });
+}
+
+/**
  * Calculate and display the results when the form is submitted.
  * @param {Event} event
  */
@@ -188,10 +252,12 @@ function handleSubmit(event) {
   // Read numeric inputs
   const baseValue = parseFloat(document.getElementById("baseValue").value) || 0;
   const weight = parseFloat(document.getElementById("weight").value) || 0;
-  const baseWeight = parseFloat(document.getElementById("baseWeight").value) || 1;
+  const baseWeight =
+    parseFloat(document.getElementById("baseWeight").value) || 1;
   const quantity = parseInt(document.getElementById("quantity").value, 10) || 1;
   const growthSelect = document.getElementById("growth");
-  const growthMulti = parseFloat(growthSelect.selectedOptions[0].dataset.multi) || 1;
+  const growthMulti =
+    parseFloat(growthSelect.selectedOptions[0].dataset.multi) || 1;
 
   // Gather selected environmental mutations
   const selectedMutations = [];
@@ -225,15 +291,19 @@ function handleSubmit(event) {
 
   // Format numbers
   function formatNumber(num) {
-    return Number.isFinite(num) ? num.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "0";
+    return Number.isFinite(num)
+      ? num.toLocaleString(undefined, { maximumFractionDigits: 2 })
+      : "0";
   }
 
   // Build display line in correct order
   const displayLine = selectedMutations.join(" • ");
 
   // Update UI
-  document.getElementById("mutationDisplay").textContent = displayLine || "(none)";
-  document.getElementById("mutationMultiplier").textContent = formatNumber(mutationMultiplier);
+  document.getElementById("mutationDisplay").textContent =
+    displayLine || "(none)";
+  document.getElementById("mutationMultiplier").textContent =
+    formatNumber(mutationMultiplier);
   document.getElementById("cropValue").textContent = formatNumber(cropValue);
   document.getElementById("totalPrice").textContent = formatNumber(totalPrice);
   document.getElementById("results").hidden = false;
@@ -241,6 +311,7 @@ function handleSubmit(event) {
 
 // Initialise and bind events on DOMContentLoaded
 document.addEventListener("DOMContentLoaded", () => {
+  initCrops();
   initMutations();
   document.getElementById("calc-form").addEventListener("submit", handleSubmit);
 });
