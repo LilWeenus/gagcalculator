@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grow a Garden Mutation Calculator</title>
+    <!--
+      A simple calculator for Roblox's Grow a Garden game.  Users can input a crop's
+      base value and weight, pick a growth mutation (None, Golden or Rainbow) and
+      select any number of environmental mutations.  The page then calculates
+      the weighted crop value, mutation multiplier and final price according to
+      the formula documented on the Grow a Garden Wiki:
+
+        Mutation Multiplier = Growth × ( 1 + ΣMutations – MutationCount )
+
+      where ΣMutations is the sum of the individual multipliers for each
+      environmental mutation and MutationCount is the number of those mutations.
+      The weighted crop value is
+
+        Crop Value = Base Value × ( Weight / Base Weight )^2
+
+      The final total is Crop Value × Mutation Multiplier × Quantity.
+
+      The mutation list and multipliers come from the MutationHandler script
+      decompiled from the game and are ordered according to the in–game display
+      order that we reverse engineered.  See script.js for the underlying data.
+    -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Grow a Garden Mutation Calculator</h1>
+      <p>
+        Use this tool to calculate the value of your mutated crops in Roblox's
+        <em>Grow a Garden</em>.  Enter your crop's base value and weight, choose
+        your growth mutation and select any environmental mutations.  The
+        calculator will show the mutation display line, mutation multiplier and
+        total value.
+      </p>
+    </header>
+    <main>
+      <form id="calc-form" autocomplete="off">
+        <div class="grid">
+          <div class="form-group">
+            <label for="baseValue">Base value (¢)</label>
+            <input type="number" id="baseValue" min="0" step="0.01" value="0" />
+          </div>
+          <div class="form-group">
+            <label for="weight">Weight (kg)</label>
+            <input type="number" id="weight" min="0" step="0.01" value="0" />
+          </div>
+          <div class="form-group">
+            <label for="baseWeight">Base weight (kg)</label>
+            <input type="number" id="baseWeight" min="0" step="0.01" value="1" />
+          </div>
+          <div class="form-group">
+            <label for="quantity">Quantity (pcs)</label>
+            <input type="number" id="quantity" min="1" step="1" value="1" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="growth">Growth mutation</label>
+          <select id="growth">
+            <option value="none" data-multi="1">None (×1)</option>
+            <option value="golden" data-multi="20">Golden (×20)</option>
+            <option value="rainbow" data-multi="50">Rainbow (×50)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Environmental mutations (select any)</label>
+          <div id="mutations" class="mutations-list"></div>
+        </div>
+        <button type="submit">Calculate</button>
+      </form>
+      <section id="results" aria-live="polite" hidden>
+        <h2>Results</h2>
+        <p><strong>Mutation display:</strong> <span id="mutationDisplay"></span></p>
+        <p><strong>Total mutation multiplier:</strong> ×<span id="mutationMultiplier"></span></p>
+        <p><strong>Crop value:</strong> ¢<span id="cropValue"></span></p>
+        <p><strong>Total price:</strong> ¢<span id="totalPrice"></span></p>
+      </section>
+    </main>
+    <footer>
+      <p>
+        This tool was built by the community for the community.  It is not
+        affiliated with or endorsed by the developers of <em>Grow a Garden</em>.
+        Mutation multipliers and their order are based on the latest public
+        information from the game (August 2025) and may change with future
+        updates.
+      </p>
+    </footer>
+    <script src="script.js"></script>
+  </body>
+</html>
