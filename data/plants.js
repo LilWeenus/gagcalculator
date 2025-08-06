@@ -48,6 +48,7 @@ export const plants = [
   // Easter Event 2025
   { id: "chocolate-carrot", name: "Chocolate Carrot", baseValue: 9960, icon: "chocolate-carrot.png", tier: "Common", shop: "Easter Event" },
   { id: "red-lollipop", name: "Red Lollipop", baseValue: 45102, icon: "red-lollipop.png", tier: "Uncommon", shop: "Easter Event" },
+  { id: "blue-lollipop", name: "Blue Lollipop", baseValue: 48000, icon: "blue-lollipop.png", tier: "Uncommon", shop: "Easter Event" },
   { id: "candy-sunflower", name: "Candy Sunflower", baseValue: 72200, icon: "candy-sunflower.png", tier: "Rare", shop: "Easter Event" },
   { id: "easter-egg", name: "Easter Egg", baseValue: 2256, icon: "easter-egg.png", tier: "Mythical", shop: "Easter Event" },
   { id: "candy-blossom", name: "Candy Blossom", baseValue: 90250, icon: "candy-blossom.png", tier: "Divine", shop: "Easter Event" },
@@ -65,6 +66,7 @@ export const plants = [
   { id: "nectarshade", name: "Nectarshade", baseValue: 45125, icon: "nectarshade.png", tier: "Rare", shop: "Queen Bee Shop" },
   { id: "nectarine", name: "Nectarine", baseValue: 35000, icon: "nectarine.png", tier: "Mythical", shop: "Queen Bee Shop" },
   { id: "hive-fruit", name: "Hive Fruit", baseValue: 55955, icon: "hive-fruit.png", tier: "Divine", shop: "Queen Bee Shop" },
+  { id: "sunflower", name: "Sunflower", baseValue: 150000, icon: "sunflower.png", tier: "Legendary", shop: "Queen Bee Shop" },
 
   // July 4th Shop
   { id: "firework-flower", name: "Firework Flower", baseValue: 136278, icon: "firework-flower.png", tier: "Legendary", shop: "July 4th Shop" },
@@ -108,5 +110,34 @@ export const plants = [
   { id: "moonflower", name: "Moonflower", baseValue: 8574, icon: "moonflower.png", tier: "Legendary", shop: "Night Seed Pack" },
   { id: "starfruit", name: "Starfruit", baseValue: 13538, icon: "starfruit.png", tier: "Legendary", shop: "Night Seed Pack" },
   { id: "moonglow", name: "Moonglow", baseValue: 18050, icon: "moonglow.png", tier: "Mythical", shop: "Night Seed Pack" },
-  { id: "moon-blossom", name: "Moon Blossom", baseValue: 60166, icon: "moon-blossom.png", tier: "Divine", shop: "Night Seed Pack" }
+  { id: "moon-blossom", name: "Moon Blossom", baseValue: 60166, icon: "moon-blossom.png", tier: "Divine", shop: "Night Seed Pack" },
+
+  // Flower Seed Pack
+  { id: "rose", name: "Rose", baseValue: 35000, icon: "rose.png", tier: "Legendary", shop: "Flower Seed Pack" },
+  { id: "jasmine", name: "Jasmine", baseValue: 42000, icon: "jasmine.png", tier: "Legendary", shop: "Flower Seed Pack" },
+  { id: "hibiscus", name: "Hibiscus", baseValue: 28000, icon: "hibiscus.png", tier: "Rare", shop: "Flower Seed Pack" },
+  { id: "orchid", name: "Orchid", baseValue: 65000, icon: "orchid.png", tier: "Mythical", shop: "Flower Seed Pack" },
+  { id: "marigold", name: "Marigold", baseValue: 18500, icon: "marigold.png", tier: "Uncommon", shop: "Flower Seed Pack" },
+
+  // Crafters Seed Pack
+  { id: "bendboo", name: "Bendboo", baseValue: 139888, icon: "bendboo.png", tier: "Mythical", shop: "Crafters Seed Pack" },
+  { id: "violet-corn", name: "Violet Corn", baseValue: 85000, icon: "violet-corn.png", tier: "Legendary", shop: "Crafters Seed Pack" },
+  { id: "succulent", name: "Succulent", baseValue: 45000, icon: "succulent.png", tier: "Rare", shop: "Crafters Seed Pack" },
+  { id: "suncoil", name: "Suncoil", baseValue: 92000, icon: "suncoil.png", tier: "Mythical", shop: "Crafters Seed Pack" },
+
+  // Prehistoric Event
+  { id: "bone-blossom", name: "Bone Blossom", baseValue: 180000, icon: "bone-blossom.png", tier: "Divine", shop: "Prehistoric Event" },
+  { id: "fossilight", name: "Fossilight", baseValue: 95000, icon: "fossilight.png", tier: "Legendary", shop: "Prehistoric Event" },
+  { id: "horned-dinoshroom", name: "Horned Dinoshroom", baseValue: 125000, icon: "horned-dinoshroom.png", tier: "Mythical", shop: "Prehistoric Event" },
+  { id: "stonebite", name: "Stonebite", baseValue: 67000, icon: "stonebite.png", tier: "Rare", shop: "Prehistoric Event" },
+
+  // Paradise Event
+  { id: "paradise-petal", name: "Paradise Petal", baseValue: 105000, icon: "paradise-petal.png", tier: "Legendary", shop: "Paradise Event" },
+  { id: "pink-lily", name: "Pink Lily", baseValue: 78000, icon: "pink-lily.png", tier: "Mythical", shop: "Paradise Event" },
+
+  // Special/Event Plants
+  { id: "golden-carrot", name: "Golden Carrot", baseValue: 50000, icon: "golden-carrot.png", tier: "Legendary", shop: "Special Event" },
+  { id: "rainbow-tulip", name: "Rainbow Tulip", baseValue: 75000, icon: "rainbow-tulip.png", tier: "Mythical", shop: "Special Event" },
+  { id: "crystal-flower", name: "Crystal Flower", baseValue: 120000, icon: "crystal-flower.png", tier: "Divine", shop: "Special Event" },
+  { id: "void-berry", name: "Void Berry", baseValue: 200000, icon: "void-berry.png", tier: "Prismatic", shop: "Special Event" }
 ];
