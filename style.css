@@ -25,7 +25,8 @@ h1 {
   margin: 0;
   font-size: 2rem;
   color: #59b46b;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
+  font-weight: 700;
 }
 
 header p {
@@ -259,11 +260,11 @@ input:focus, select:focus {
 
 #results {
   margin-top: 2rem;
-  background: #f0fff6;
+  background: linear-gradient(135deg, #f0fff6 0%, #e8f5ee 100%);
   border: 1px solid #b5e2c2;
-  border-radius: 7px;
-  padding: 1rem 1.2rem;
-  box-shadow: 0 1px 8px #0001;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 
 #results h2 {
@@ -352,6 +353,56 @@ footer {
 
 .mutations-list::-webkit-scrollbar-thumb:hover {
   background: #59b46b;
+}
+
+.mutation-help {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 0.3rem;
+  font-style: italic;
+}
+
+input::placeholder {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+input:focus::placeholder {
+  color: #bbb;
+}
+
+/* Enhanced form styling */
+.form-group label {
+  font-size: 0.95rem;
+  margin-bottom: 0.3rem;
+}
+
+/* Better visual hierarchy */
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  color: #59b46b;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+/* Results section enhancements */
+#results p strong {
+  color: #2d5016;
+  font-weight: 600;
+}
+
+/* Loading states and interactions */
+.calc-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.calc-btn:disabled:hover {
+  background: #ccc;
+  transform: none;
+  box-shadow: 0 2px 8px #0002;
 }
 
 @media (max-width: 700px) {
