@@ -24,6 +24,8 @@ function initMutations() {
   });
 }
 
+let selectedPlant = null;
+
 function initCrops() {
   const listEl = document.getElementById("cropList");
   const searchEl = document.getElementById("cropSearch");
@@ -69,11 +71,8 @@ function initCrops() {
         div.classList.add("selected");
         selected = div;
         
-        // Auto-fill base value when plant is selected
-        const baseValueInput = document.getElementById("baseValue");
-        if (baseValueInput) {
-          baseValueInput.value = plant.baseValue;
-        }
+        // Store selected plant data
+        selectedPlant = plant;
       });
       
       listEl.appendChild(div);
@@ -89,9 +88,14 @@ function initCrops() {
 function handleSubmit(event) {
   event.preventDefault();
   
-  const baseValue = parseFloat(document.getElementById("baseValue").value) || 0;
+  if (!selectedPlant) {
+    alert("Please select a plant first!");
+    return;
+  }
+  
+  const baseValue = selectedPlant.baseValue || 0;
+  const baseWeight = selectedPlant.baseWeight || 1;
   const weight = parseFloat(document.getElementById("weight").value) || 0;
-  const baseWeight = parseFloat(document.getElementById("baseWeight").value) || 1;
   const quantity = parseInt(document.getElementById("quantity").value, 10) || 1;
   const growthSelect = document.getElementById("growth");
   const growthMulti = parseFloat(growthSelect.selectedOptions[0].dataset.multi) || 1;
@@ -197,9 +201,14 @@ function updateCalculationWithFriendBoost() {
   window.handleSubmit = function(event) {
     event.preventDefault();
     
-    const baseValue = parseFloat(document.getElementById("baseValue").value) || 0;
+    if (!selectedPlant) {
+      alert("Please select a plant first!");
+      return;
+    }
+    
+    const baseValue = selectedPlant.baseValue || 0;
+    const baseWeight = selectedPlant.baseWeight || 1;
     const weight = parseFloat(document.getElementById("weight").value) || 0;
-    const baseWeight = parseFloat(document.getElementById("baseWeight").value) || 1;
     const quantity = parseInt(document.getElementById("quantity").value, 10) || 1;
     const growthSelect = document.getElementById("growth");
     const growthMulti = parseFloat(growthSelect.selectedOptions[0].dataset.multi) || 1;
