@@ -1,43 +1,5 @@
-// --- Crop and Mutation Logic (unchanged) ---
-
-const mutationOrder = [
-  "Eclipsed", "Meteoric", "Fried", "Drenched", "Tempestuous", "Shocked", "Aurora", "Choc",
-  "Bloodlit", "Spaghetti", "Sliced", "Verdant", "Infected", "AncientAmber", "Twisted",
-  "Alienlike", "FoxfireChakra", "CorruptChakra", "Cooked", "Chilled", "Heavenly",
-  "Radioactive", "Celestial", "Windstruck", "Burnt", "Wet", "Friendbound", "Paradisal",
-  "Clay", "Amber", "Lightcycle", "HoneyGlazed", "Frozen", "Corrupt", "OldAmber", "Subzero",
-  "Touchdown", "Disco", "Sandy", "Sauce", "Moonlit", "Jackpot", "Cloudtouched", "Toxic",
-  "Tranquil", "Enlightened", "Meatball", "CorruptFoxfireChakra", "HarmonisedFoxfireChakra",
-  "HarmonisedChakra", "Static", "Pasta", "Chakra", "Plasma", "Molten", "Dawnbound",
-  "Ceramic", "Wiltproof", "Pollinated", "Zombified", "Blitzshock", "Sundried", "Voidtouched",
-  "Galactic", "Acidic"
-];
-
-const mutationMultipliers = {
-  Eclipsed: 30, Meteoric: 125, Fried: 8, Drenched: 5, Tempestuous: 12, Shocked: 100,
-  Aurora: 90, Choc: 2, Bloodlit: 4, Spaghetti: 15, Sliced: 50, Verdant: 4, Infected: 75,
-  AncientAmber: 50, Twisted: 5, Alienlike: 100, FoxfireChakra: 90, CorruptChakra: 15,
-  Cooked: 10, Chilled: 2, Heavenly: 5, Radioactive: 80, Celestial: 120, Windstruck: 2,
-  Burnt: 4, Wet: 2, Friendbound: 70, Paradisal: 100, Clay: 5, Amber: 10, Lightcycle: 180,
-  HoneyGlazed: 5, Frozen: 10, Corrupt: 20, OldAmber: 20, Subzero: 40, Touchdown: 105,
-  Disco: 125, Sandy: 3, Sauce: 12, Moonlit: 2, Jackpot: 15, Cloudtouched: 5, Toxic: 12,
-  Tranquil: 20, Enlightened: 120, Meatball: 18, CorruptFoxfireChakra: 25,
-  HarmonisedFoxfireChakra: 190, HarmonisedChakra: 35, Static: 8, Pasta: 10, Chakra: 15,
-  Plasma: 5, Molten: 25, Dawnbound: 150, Ceramic: 30, Wiltproof: 4, Pollinated: 3,
-  Zombified: 25, Blitzshock: 50, Sundried: 85, Voidtouched: 135, Galactic: 120, Acidic: 6
-};
-
-const crops = [
-  { name: "Apple", icon: "apple.png" }, { name: "Banana", icon: "banana.png" },
-  { name: "Blueberry", icon: "blueberry.png" }, { name: "Avocado", icon: "avocado.png" },
-  { name: "Blood Banana", icon: "blood-banana.png" }, { name: "Amber Spine", icon: "amber-spine.png" },
-  { name: "Aloe Vera", icon: "aloe-vera.png" }, { name: "Bell Pepper", icon: "bell-pepper.png" },
-  { name: "Bee Balm", icon: "bee-balm.png" }, { name: "Bamboo", icon: "bamboo.png" },
-  { name: "Bone Blossom", icon: "bone-blossom.png" }, { name: "Cactus", icon: "cactus.png" },
-  { name: "Blueberry", icon: "blueberry.png" }, { name: "Artichoke", icon: "artichoke.png" },
-  { name: "Cacao", icon: "cacao.png" }, { name: "Burning Bud", icon: "burning-bud.png" }
-  // Add more fruits as desired, with their icon filenames
-];
+import { mutationOrder, mutationMultipliers } from './data/mutations.js';
+import { plants } from './data/plants.js';
 
 // --- UI Logic ---
 
@@ -70,28 +32,54 @@ function initCrops() {
   function render(filter = "") {
     listEl.innerHTML = "";
     const lowerFilter = filter.trim().toLowerCase();
-    const filtered = crops.filter((c) => c.name.toLowerCase().includes(lowerFilter));
-    filtered.forEach((crop) => {
+    const filtered = plants.filter((plant) => 
+      plant.name.toLowerCase().includes(lowerFilter) || 
+      plant.tier.toLowerCase().includes(lowerFilter) ||
+      (plant.shop && plant.shop.toLowerCase().includes(lowerFilter))
+    );
+    
+    filtered.forEach((plant) => {
       const div = document.createElement("div");
       div.className = "crop-item";
-      if (crop.icon) {
+      div.dataset.plantId = plant.id;
+      
+      if (plant.icon) {
         const img = document.createElement("img");
-        img.src = `assets/${crop.icon}`;
-        img.alt = crop.name;
+        img.src = `assets/icons/plants/${plant.icon}`;
+        img.alt = plant.name;
+        img.onerror = function() {
+          // Fallback to a generic icon or hide the image
+          this.style.display = 'none';
+        };
         div.appendChild(img);
       }
+      
       const span = document.createElement("span");
-      span.textContent = crop.name;
+      span.textContent = plant.name;
       div.appendChild(span);
+      
+      // Add tier indicator
+      const tierSpan = document.createElement("span");
+      tierSpan.className = "tier-indicator";
+      tierSpan.textContent = plant.tier;
+      div.appendChild(tierSpan);
+      
       div.addEventListener("click", () => {
         if (selected) selected.classList.remove("selected");
         div.classList.add("selected");
         selected = div;
-        // Optional: autofill base values/weights if you want
+        
+        // Auto-fill base value when plant is selected
+        const baseValueInput = document.getElementById("baseValue");
+        if (baseValueInput) {
+          baseValueInput.value = plant.baseValue;
+        }
       });
+      
       listEl.appendChild(div);
     });
   }
+  
   render();
   searchEl.addEventListener("input", (e) => {
     render(e.target.value);
@@ -100,6 +88,7 @@ function initCrops() {
 
 function handleSubmit(event) {
   event.preventDefault();
+  
   const baseValue = parseFloat(document.getElementById("baseValue").value) || 0;
   const weight = parseFloat(document.getElementById("weight").value) || 0;
   const baseWeight = parseFloat(document.getElementById("baseWeight").value) || 1;
@@ -116,43 +105,167 @@ function handleSubmit(event) {
     }
   });
 
-  // Compute ΣMutations and the count
+  // Compute ΣMutations and the count - using the exact formula from reference site
   let sumMultipliers = 0;
   selectedMutations.forEach((name) => {
     sumMultipliers += mutationMultipliers[name] || 0;
   });
   const mutationCount = selectedMutations.length;
 
-  // Mutation multiplier formula (unchanged!)
-  const mutationMultiplier = growthMulti * (1 + sumMultipliers - mutationCount);
+  // Mutation multiplier formula: Growth × (1 + ΣMutations - MutationCount)
+  // This matches the reference site formula
+  const environmentalMultiplier = mutationCount > 0 ? (1 + sumMultipliers - mutationCount) : 1;
+  const mutationMultiplier = growthMulti * environmentalMultiplier;
 
-  // Weighted crop value
+  // Weighted crop value - using weight ratio squared formula
   let cropValue = 0;
-  if (baseWeight > 0) {
+  if (baseWeight > 0 && weight > 0) {
     const weightRatio = weight / baseWeight;
     cropValue = baseValue * Math.pow(weightRatio, 2);
+  } else if (weight > 0) {
+    // If no base weight specified, use linear scaling
+    cropValue = baseValue * weight;
+  } else {
+    // If no weight specified, use base value
+    cropValue = baseValue;
   }
 
-  // Total price
-  const totalPrice = cropValue * mutationMultiplier * quantity;
+  // Apply mutation multiplier to get final value
+  const mutatedValue = cropValue * mutationMultiplier;
+  
+  // Total price with quantity
+  const totalPrice = mutatedValue * quantity;
 
   function formatNumber(num) {
-    return Number.isFinite(num)
-      ? num.toLocaleString(undefined, { maximumFractionDigits: 2 })
-      : "0";
+    if (!Number.isFinite(num)) return "0";
+    
+    // Format large numbers with appropriate suffixes
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(2) + "B";
+    } else if (num >= 1000000) {
+      return (num / 1000000).toFixed(2) + "M";
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(2) + "K";
+    } else {
+      return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
   }
 
   const displayLine = selectedMutations.join(" • ");
 
   document.getElementById("mutationDisplay").textContent = displayLine || "(none)";
   document.getElementById("mutationMultiplier").textContent = formatNumber(mutationMultiplier);
-  document.getElementById("cropValue").textContent = formatNumber(cropValue);
+  document.getElementById("cropValue").textContent = formatNumber(mutatedValue);
   document.getElementById("totalPrice").textContent = formatNumber(totalPrice);
   document.getElementById("results").hidden = false;
+}
+
+// Add friend boost functionality
+function addFriendBoostSupport() {
+  const form = document.getElementById("calc-form");
+  const friendBoostGroup = document.createElement("div");
+  friendBoostGroup.className = "form-group";
+  
+  const label = document.createElement("label");
+  label.setAttribute("for", "friendBoost");
+  label.textContent = "Friend Boost:";
+  
+  const select = document.createElement("select");
+  select.id = "friendBoost";
+  
+  // Add friend boost options (0% to 100%)
+  for (let i = 0; i <= 100; i += 10) {
+    const option = document.createElement("option");
+    option.value = i / 100;
+    option.textContent = `${i}%`;
+    if (i === 0) option.selected = true;
+    select.appendChild(option);
+  }
+  
+  friendBoostGroup.appendChild(label);
+  friendBoostGroup.appendChild(select);
+  
+  // Insert before the calculate button
+  const calcButton = form.querySelector(".calc-btn");
+  form.insertBefore(friendBoostGroup, calcButton);
+}
+
+// Update the calculation to include friend boost
+function updateCalculationWithFriendBoost() {
+  const originalHandleSubmit = handleSubmit;
+  
+  window.handleSubmit = function(event) {
+    event.preventDefault();
+    
+    const baseValue = parseFloat(document.getElementById("baseValue").value) || 0;
+    const weight = parseFloat(document.getElementById("weight").value) || 0;
+    const baseWeight = parseFloat(document.getElementById("baseWeight").value) || 1;
+    const quantity = parseInt(document.getElementById("quantity").value, 10) || 1;
+    const growthSelect = document.getElementById("growth");
+    const growthMulti = parseFloat(growthSelect.selectedOptions[0].dataset.multi) || 1;
+    const friendBoost = parseFloat(document.getElementById("friendBoost")?.value) || 0;
+
+    // Gather selected environmental mutations
+    const selectedMutations = [];
+    mutationOrder.forEach((name) => {
+      const checkbox = document.getElementById(`mut-${name}`);
+      if (checkbox && checkbox.checked) {
+        selectedMutations.push(name);
+      }
+    });
+
+    // Compute mutation multiplier
+    let sumMultipliers = 0;
+    selectedMutations.forEach((name) => {
+      sumMultipliers += mutationMultipliers[name] || 0;
+    });
+    const mutationCount = selectedMutations.length;
+    const environmentalMultiplier = mutationCount > 0 ? (1 + sumMultipliers - mutationCount) : 1;
+    const mutationMultiplier = growthMulti * environmentalMultiplier;
+
+    // Calculate crop value
+    let cropValue = 0;
+    if (baseWeight > 0 && weight > 0) {
+      const weightRatio = weight / baseWeight;
+      cropValue = baseValue * Math.pow(weightRatio, 2);
+    } else if (weight > 0) {
+      cropValue = baseValue * weight;
+    } else {
+      cropValue = baseValue;
+    }
+
+    // Apply mutation and friend boost multipliers
+    const mutatedValue = cropValue * mutationMultiplier;
+    const friendBoostedValue = mutatedValue * (1 + friendBoost);
+    const totalPrice = friendBoostedValue * quantity;
+
+    function formatNumber(num) {
+      if (!Number.isFinite(num)) return "0";
+      
+      if (num >= 1000000000) {
+        return (num / 1000000000).toFixed(2) + "B";
+      } else if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + "M";
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(2) + "K";
+      } else {
+        return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      }
+    }
+
+    const displayLine = selectedMutations.join(" • ");
+    document.getElementById("mutationDisplay").textContent = displayLine || "(none)";
+    document.getElementById("mutationMultiplier").textContent = formatNumber(mutationMultiplier);
+    document.getElementById("cropValue").textContent = formatNumber(friendBoostedValue);
+    document.getElementById("totalPrice").textContent = formatNumber(totalPrice);
+    document.getElementById("results").hidden = false;
+  };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   initCrops();
   initMutations();
-  document.getElementById("calc-form").addEventListener("submit", handleSubmit);
+  addFriendBoostSupport();
+  updateCalculationWithFriendBoost();
+  document.getElementById("calc-form").addEventListener("submit", window.handleSubmit || handleSubmit);
 });

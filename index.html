@@ -3,71 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fruit Mutation Calculator</title>
+  <title>Grow a Garden Calculator</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
-    <img src="assets/fruit-header-icon.png" alt="Fruit Calculator Icon" class="header-icon" />
-    <h1>Fruit Mutation Calculator</h1>
+    <img src="assets/fruit-header-icon.png" alt="Grow a Garden Calculator Icon" class="header-icon" />
+    <h1>Grow a Garden Calculator</h1>
     <p>
-      Calculate the value of your mutated fruits in Roblox's <em>Grow a Garden</em>.
-      Enter your fruit's base value and weight, choose your growth mutation, select any environmental mutations, and get the total value.
+      Calculate the value of your crops in Roblox's <em>Grow a Garden</em>.
+      Select your plant, apply mutations, enter weight and quantity to get the total value.
     </p>
   </header>
   <main>
     <section id="fruit-select">
-      <label for="cropSearch">Select Fruit:</label>
-      <input type="text" id="cropSearch" placeholder="Search fruits..." />
+      <label for="cropSearch">🌱 Select Plant:</label>
+      <input type="text" id="cropSearch" placeholder="Search plants by name, tier, or shop..." />
       <div id="cropList" class="crop-list"></div>
     </section>
+    
     <form id="calc-form" autocomplete="off">
       <div class="grid">
         <div class="form-group">
-          <label for="baseValue">Base Value (¢)</label>
-          <input type="number" id="baseValue" min="0" step="0.01" value="0" />
+          <label for="baseValue">💰 Base Value (¢)</label>
+          <input type="number" id="baseValue" min="0" step="0.01" value="0" 
+                 placeholder="Auto-filled when plant selected" />
         </div>
         <div class="form-group">
-          <label for="weight">Weight (kg)</label>
-          <input type="number" id="weight" min="0" step="0.01" value="0" />
+          <label for="weight">⚖️ Weight (kg)</label>
+          <input type="number" id="weight" min="0" step="0.01" value="0" 
+                 placeholder="Current plant weight" />
         </div>
         <div class="form-group">
-          <label for="baseWeight">Base Weight (kg)</label>
-          <input type="number" id="baseWeight" min="0" step="0.01" value="1" />
+          <label for="baseWeight">📏 Base Weight (kg)</label>
+          <input type="number" id="baseWeight" min="0" step="0.01" value="1" 
+                 placeholder="Default plant weight" />
         </div>
         <div class="form-group">
-          <label for="quantity">Quantity (pcs)</label>
-          <input type="number" id="quantity" min="1" step="1" value="1" />
+          <label for="quantity">🔢 Quantity (pcs)</label>
+          <input type="number" id="quantity" min="1" step="1" value="1" 
+                 placeholder="Number of plants" />
         </div>
       </div>
+      
       <div class="form-group">
-        <label for="growth">Growth Mutation:</label>
+        <label for="growth">⭐ Growth Mutation:</label>
         <select id="growth">
           <option value="none" data-multi="1">None (×1)</option>
           <option value="golden" data-multi="20">Golden (×20)</option>
           <option value="rainbow" data-multi="50">Rainbow (×50)</option>
         </select>
       </div>
+      
       <div class="form-group">
-        <label>Environmental Mutations:</label>
+        <label>✨ Environmental Mutations:</label>
+        <div class="mutation-help">Select multiple mutations to stack their effects</div>
         <div id="mutations" class="mutations-list"></div>
       </div>
-      <button type="submit" class="calc-btn">Calculate</button>
+      
+      <button type="submit" class="calc-btn">🧮 Calculate Value</button>
     </form>
+    
     <section id="results" aria-live="polite" hidden>
-      <h2>Results</h2>
-      <p><strong>Mutation Display:</strong> <span id="mutationDisplay"></span></p>
-      <p><strong>Total Mutation Multiplier:</strong> ×<span id="mutationMultiplier"></span></p>
-      <p><strong>Fruit Value:</strong> ¢<span id="cropValue"></span></p>
-      <p><strong>Total Price:</strong> ¢<span id="totalPrice"></span></p>
+      <h2>💎 Calculation Results</h2>
+      <p><strong>Active Mutations:</strong> <span id="mutationDisplay"></span></p>
+      <p><strong>Total Multiplier:</strong> ×<span id="mutationMultiplier"></span></p>
+      <p><strong>Plant Value:</strong> ¢<span id="cropValue"></span></p>
+      <p><strong>Total Worth:</strong> ¢<span id="totalPrice"></span></p>
     </section>
   </main>
+  
   <footer>
     <p>
-      Community-made calculator. Not affiliated with <em>Grow a Garden</em> devs.
-      Mutation multipliers/order reflect the latest public info (Aug 2025).
+      Community-made calculator for <em>Grow a Garden</em>. Not officially affiliated with the game developers.
+      Mutation data and formulas reflect the latest community knowledge (January 2025).
     </p>
   </footer>
-  <script src="script.js"></script>
+  
+  <script type="module" src="script.js"></script>
 </body>
 </html>
