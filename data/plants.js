@@ -65,6 +65,7 @@ export const plants = [
   { id: "nectarshade", name: "Nectarshade", baseValue: 45125, icon: "nectarshade.png", tier: "Rare", shop: "Queen Bee Shop" },
   { id: "nectarine", name: "Nectarine", baseValue: 35000, icon: "nectarine.png", tier: "Mythical", shop: "Queen Bee Shop" },
   { id: "hive-fruit", name: "Hive Fruit", baseValue: 55955, icon: "hive-fruit.png", tier: "Divine", shop: "Queen Bee Shop" },
+  { id: "sunflower", name: "Sunflower", baseValue: 150000, icon: "sunflower.png", tier: "Legendary", shop: "Queen Bee Shop" },
 
   // July 4th Shop
   { id: "firework-flower", name: "Firework Flower", baseValue: 136278, icon: "firework-flower.png", tier: "Legendary", shop: "July 4th Shop" },
@@ -108,5 +109,18 @@ export const plants = [
   { id: "moonflower", name: "Moonflower", baseValue: 8574, icon: "moonflower.png", tier: "Legendary", shop: "Night Seed Pack" },
   { id: "starfruit", name: "Starfruit", baseValue: 13538, icon: "starfruit.png", tier: "Legendary", shop: "Night Seed Pack" },
   { id: "moonglow", name: "Moonglow", baseValue: 18050, icon: "moonglow.png", tier: "Mythical", shop: "Night Seed Pack" },
-  { id: "moon-blossom", name: "Moon Blossom", baseValue: 60166, icon: "moon-blossom.png", tier: "Divine", shop: "Night Seed Pack" }
+  { id: "moon-blossom", name: "Moon Blossom", baseValue: 60166, icon: "moon-blossom.png", tier: "Divine", shop: "Night Seed Pack" },
+
+  // Flower Seed Pack
+  { id: "rose", name: "Rose", baseValue: 35000, icon: "rose.png", tier: "Legendary", shop: "Flower Seed Pack" },
+  { id: "jasmine", name: "Jasmine", baseValue: 42000, icon: "jasmine.png", tier: "Legendary", shop: "Flower Seed Pack" },
+  { id: "hibiscus", name: "Hibiscus", baseValue: 28000, icon: "hibiscus.png", tier: "Rare", shop: "Flower Seed Pack" },
+  { id: "orchid", name: "Orchid", baseValue: 65000, icon: "orchid.png", tier: "Mythical", shop: "Flower Seed Pack" },
+  { id: "marigold", name: "Marigold", baseValue: 18500, icon: "marigold.png", tier: "Uncommon", shop: "Flower Seed Pack" },
+
+  // Special/Event Plants
+  { id: "golden-carrot", name: "Golden Carrot", baseValue: 50000, icon: "golden-carrot.png", tier: "Legendary", shop: "Special Event" },
+  { id: "rainbow-tulip", name: "Rainbow Tulip", baseValue: 75000, icon: "rainbow-tulip.png", tier: "Mythical", shop: "Special Event" },
+  { id: "crystal-flower", name: "Crystal Flower", baseValue: 120000, icon: "crystal-flower.png", tier: "Divine", shop: "Special Event" },
+  { id: "void-berry", name: "Void Berry", baseValue: 200000, icon: "void-berry.png", tier: "Prismatic", shop: "Special Event" }
 ];
