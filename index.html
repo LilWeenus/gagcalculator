@@ -4,18 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Grow a Garden Calculator</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' ry='12' fill='%232a2a40'/><circle cx='32' cy='38' r='10' fill='%234ecdc4'/><path d='M32 38c0-8 6-14 14-14-2 6-8 8-14 8-6 0-12-2-14-8 8 0 14 6 14 14z' fill='%237dd87f'/></svg>" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <img src="assets/fruit-header-icon.png" alt="Grow a Garden Calculator Icon" class="header-icon" />
-    <h1>Grow a Garden Calculator</h1>
-    <p>
-      Calculate the value of your crops in Roblox's <em>Grow a Garden</em>.
-      Select your plant, apply mutations, enter weight and quantity to get the total value.
-    </p>
-  </header>
-  <main>
+  <div class="app-container">
+    <main>
     <section id="fruit-select">
       <label for="cropSearch">🌱 Select Plant:</label>
       <input type="text" id="cropSearch" placeholder="Search plants by name, tier, or shop..." />
@@ -23,53 +17,188 @@
     </section>
     
     <form id="calc-form" autocomplete="off">
-      <div class="grid">
-        <div class="form-group">
-          <label for="weight">⚖️ Weight (kg)</label>
-          <input type="number" id="weight" min="0" step="0.01" value="0" 
-                 placeholder="Current plant weight" />
+      <!-- Mutation Controls -->
+      <div class="mutation-controls">
+        <!-- Mutations Row -->
+        <div class="mutation-categories-row">
+          <!-- Growth Mutations -->
+          <div class="mutation-category growth-mutations">
+            <div class="mutation-category-header">
+              <span class="category-icon">⭐</span>
+              <span class="category-title">Growth Mutations</span>
+            </div>
+            <div class="mutation-buttons">
+              <button type="button" class="mutation-button" id="growth-none" data-value="none" data-multi="1">None (×1)</button>
+              <button type="button" class="mutation-button" id="growth-golden" data-value="golden" data-multi="20">Golden (×20)</button>
+              <button type="button" class="mutation-button" id="growth-rainbow" data-value="rainbow" data-multi="50">Rainbow (×50)</button>
+            </div>
+            <!-- Hidden select for compatibility -->
+            <select id="growth" style="display: none;">
+              <option value="none" data-multi="1">None (×1)</option>
+              <option value="golden" data-multi="20">Golden (×20)</option>
+              <option value="rainbow" data-multi="50">Rainbow (×50)</option>
+            </select>
+          </div>
+          
+          
         </div>
+        
+        <!-- Environmental Mutations -->
         <div class="form-group">
-          <label for="quantity">🔢 Quantity (pcs)</label>
+          <label>✨ Environmental Mutations:</label>
+          <div class="mutation-sort">
+            <span class="mutation-sort-label">Sort by:</span>
+            <select id="mutationSort">
+              <option value="display">Display Order</option>
+              <option value="multiplier">Multiplier</option>
+              <option value="alpha">Alphabetical</option>
+            </select>
+            <button id="mutationSortToggle" type="button" title="Reverse order" class="icon-btn">⇅</button>
+          </div>
+          <div class="mutation-help">Select multiple mutations to stack their effects</div>
+          <div class="unreleased-toggle" style="margin: 0.25rem 0 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+            <input type="checkbox" id="toggleUnreleased" />
+            <label for="toggleUnreleased">Show unreleased mutations</label>
+          </div>
+          <div id="mutations" class="mutations-list"></div>
+        </div>
+      </div>
+      
+      <!-- Controls Row -->
+      <div class="controls-row">
+        <div class="control-group">
+          <label for="weight">Weight (kg)</label>
+          <input type="number" id="weight" min="0" step="0.01" value="1" 
+                 placeholder="1" />
+        </div>
+        <div class="control-group">
+          <label for="quantity">Quantity (pcs)</label>
           <input type="number" id="quantity" min="1" step="1" value="1" 
-                 placeholder="Number of plants" />
+                 placeholder="1" />
+        </div>
+        <div class="control-group">
+          <label for="friendBoost">Friend Boost</label>
+          <div class="slider-container">
+            <input type="range" id="friendBoost" min="0" max="100" value="0" class="slider" />
+            <span class="slider-value">0 %</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label for="maxMutation">Max Mutation</label>
+          <div class="toggle-container">
+            <input type="checkbox" id="maxMutation" class="toggle" />
+            <label for="maxMutation" class="toggle-label"></label>
+            <button type="button" id="resetBtn" class="reset-btn">Reset</button>
+          </div>
         </div>
       </div>
-      
-      <div class="form-group">
-        <label for="growth">⭐ Growth Mutation:</label>
-        <select id="growth">
-          <option value="none" data-multi="1">None (×1)</option>
-          <option value="golden" data-multi="20">Golden (×20)</option>
-          <option value="rainbow" data-multi="50">Rainbow (×50)</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label>✨ Environmental Mutations:</label>
-        <div class="mutation-help">Select multiple mutations to stack their effects</div>
-        <div id="mutations" class="mutations-list"></div>
-      </div>
-      
-      <button type="submit" class="calc-btn">🧮 Calculate Value</button>
     </form>
     
-    <section id="results" aria-live="polite" hidden>
-      <h2>💎 Calculation Results</h2>
-      <p><strong>Active Mutations:</strong> <span id="mutationDisplay"></span></p>
-      <p><strong>Total Multiplier:</strong> ×<span id="mutationMultiplier"></span></p>
-      <p><strong>Plant Value:</strong> ¢<span id="cropValue"></span></p>
-      <p><strong>Total Worth:</strong> ¢<span id="totalPrice"></span></p>
+    <!-- Total Value Display -->
+    <section id="total-value" class="total-value-section">
+      <div class="total-value-header">
+        <span class="calculator-icon">📋</span>
+        <span>Total Value</span>
+      </div>
+      <div class="total-value-amount">
+        <span class="currency">¢</span><span id="totalPrice">12,577,777,821,800</span>
+      </div>
+      <div class="total-value-subtitle">
+        (<span id="totalPriceThousand">≈12.578 Trillion</span>)
+      </div>
+    </section>
+
+    <!-- Reverse Calculator -->
+    <section id="reverse-calculator" class="reverse-calculator-section">
+      <div class="reverse-calc-header">
+        <span class="calculator-icon">⚖️</span>
+        <span>Reverse Calculator</span>
+      </div>
+      <div class="reverse-calc-description">
+        Calculate weight needed for a specific value
+      </div>
+      <div class="reverse-calc-controls">
+        <div class="control-group">
+          <label for="targetValue">Target Value (¢)</label>
+          <input type="number" id="targetValue" min="0" step="1" value="1000000" placeholder="1000000" />
+        </div>
+        <button id="calculateWeightBtn" class="calc-btn reverse-calc-btn">Calculate Weight</button>
+      </div>
+      <div class="reverse-calc-result">
+        <div class="result-label">Calculated Weight:</div>
+        <div class="result-value"><span id="requiredWeight">0</span> kg</div>
+      </div>
+    </section>
+    
+    <!-- Bottom Details -->
+    <section id="details" class="details-section">
+      <div class="detail-item">
+        <span class="detail-label">Total Multiplier:</span>
+        <span class="detail-value" id="mutationMultiplier">x14,150</span>
+      </div>
+      <div class="detail-item active-mutations">
+        <span class="active-mutations-list" id="activeMutationsList">Rainbow + Frozen + Dawnbound + Disco</span>
+      </div>
+      <div class="detail-item valuation-details">
+        <span class="detail-label">Valuation Details</span>
+        <div class="plant-details">
+          <span class="plant-icon">🦴</span>
+          <span class="plant-name" id="selectedPlantName">Bone Blossom</span>
+          <span class="plant-weight">weighing <span id="displayWeight">200</span> kg</span>
+          <span class="plant-worth">, worth <span id="plantWorth">12.578 Trillion Sheckles</span></span>
+        </div>
+      </div>
     </section>
   </main>
+    
+    <!-- Saved Plants Sidebar -->
+    <aside class="saved-plants-sidebar">
+      <div class="sidebar-header">
+        <h3>Saved Plants</h3>
+        <div class="save-controls">
+          <input type="text" id="saveNameInput" placeholder="Name your setup..." />
+          <button id="saveCurrentBtn" class="save-btn">💾 Save</button>
+        </div>
+      </div>
+      <div class="saved-plants-list" id="savedPlantsList">
+        <!-- Saved plants will be added here dynamically -->
+        <div class="empty-state">No saved plants yet</div>
+      </div>
+      <div class="sidebar-footer">
+        <button id="exportSavesBtn" class="export-btn">⬇️ Export</button>
+        <button id="importSavesBtn" class="import-btn">⬆️ Import</button>
+        <input type="file" id="importFileInput" accept=".json" style="display: none;" />
+      </div>
+    </aside>
+  </div>
   
-  <footer>
-    <p>
-      Community-made calculator for <em>Grow a Garden</em>. Not officially affiliated with the game developers.
-      Mutation data and formulas reflect the latest community knowledge (January 2025).
-    </p>
-  </footer>
+  <!-- Templates -->
+  <template id="savedPlantTemplate">
+    <div class="saved-plant-item">
+      <div class="saved-plant-header">
+        <span class="saved-plant-name"></span>
+        <div class="saved-plant-actions">
+          <button class="load-btn" title="Load this setup">📂</button>
+          <button class="update-btn" title="Update with current settings">💾</button>
+          <button class="delete-btn" title="Delete this setup">🗑️</button>
+        </div>
+      </div>
+      <div class="saved-plant-details">
+        <span class="saved-plant-icon">🌱</span>
+        <span class="saved-plant-info"></span>
+        <span class="saved-plant-value"></span>
+      </div>
+    </div>
+  </template>
   
-  <script type="module" src="script.js"></script>
+  <script>
+    (function() {
+      var bust = Date.now();
+      var s = document.createElement('script');
+      s.type = 'module';
+      s.src = 'script.js?v=' + bust;
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

@@ -1,48 +1,246 @@
+/* Mutation sort controls */
+.mutation-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.5rem 0;
+}
+
+.mutation-sort-label {
+  font-size: 0.85rem;
+  color: #b0b0b0;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mutation-sort select#mutationSort {
+  width: auto !important;
+  padding: 6px 10px !important;
+  background: #2a2a40;
+  border: 1px solid #4a5568;
+  color: #e0e0e0;
+  border-radius: 6px;
+  height: 34px !important;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  vertical-align: middle;
+  margin: 0 !important;
+}
+
+.icon-btn {
+  padding: 0 0.55rem;
+  background: #3a3a50;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: #e0e0e0;
+  cursor: pointer;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn:hover { border-color: #7dd87f; }
 body {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
   margin: 0;
   padding: 0;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   color: #e0e0e0;
+  height: 100vh;
+  overflow: hidden;
 }
 
-header {
-  background: #2d2d44;
-  border-bottom: 2px solid #404060;
-  text-align: center;
-  padding: 2rem 1rem 1rem;
-  position: relative;
-}
-
-.header-icon {
-  width: 48px;
-  height: 48px;
-  display: block;
-  margin: 0 auto 0.5rem;
-}
-
-h1 {
-  margin: 0;
-  font-size: 2rem;
-  color: #7dd87f;
-  letter-spacing: 1px;
-  font-weight: 700;
-}
-
-header p {
-  margin: 0.5rem auto 0;
-  max-width: 600px;
-  font-size: 1.08rem;
-  color: #b0b0b0;
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
 
 main {
-  max-width: 900px;
-  margin: 2rem auto 2rem;
+  flex: 1;
+  max-width: calc(100% - 300px);
+  margin: 1rem;
   background: #2a2a40;
   border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.4);
   padding: 2rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 2rem);
+}
+
+/* Saved Plants Sidebar */
+.saved-plants-sidebar {
+  width: 300px;
+  background: #2d2d44;
+  border-left: 1px solid #404060;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid #404060;
+}
+
+.sidebar-header h3 {
+  margin: 0 0 1rem 0;
+  color: #7dd87f;
+  font-size: 1.2rem;
+}
+
+.save-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.save-controls input {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #4a5568;
+  background: #3a3a50;
+  color: #e0e0e0;
+}
+
+.save-btn, .export-btn, .import-btn, .load-btn, .update-btn, .delete-btn {
+  background: #3a3a50;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover, .export-btn:hover, .import-btn:hover, .load-btn:hover, .update-btn:hover {
+  background: #4a4a60;
+  border-color: #7dd87f;
+}
+
+.delete-btn:hover {
+  background: #5a3a3a;
+  border-color: #ff6b6b;
+}
+
+.saved-plants-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.empty-state {
+  color: #888;
+  text-align: center;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid #404060;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.saved-plant-item {
+  background: #3a3a50;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #4a5568;
+}
+
+.saved-plant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.saved-plant-name {
+  font-weight: 600;
+  color: #7dd87f;
+}
+
+.saved-plant-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.saved-plant-details {
+  display: grid;
+  grid-template-columns: 1fr auto; /* name/weight on left, value on right */
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.saved-plant-icon { font-size: 1.2rem; }
+
+/* Use rarity icons in saved list when available */
+.saved-plant-item[data-tier] .saved-plant-icon {
+  width: 80px;
+  height: 80px;
+  display: inline-block;
+  background-size: contain;
+  background-repeat: no-repeat;
+  vertical-align: middle;
+  font-size: 0; /* hide fallback emoji */
+}
+.saved-plant-item .saved-plant-icon { display: none; }
+/* Force-hide any tier-targeted saved icon rules to avoid reserved space */
+.saved-plant-item[data-tier] .saved-plant-icon {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.saved-plant-info {
+  color: #b0b0b0;
+}
+
+.saved-plant-value {
+  font-weight: 600;
+  color: #4ecdc4;
+}
+
+/* Tier colors for saved plants */
+.saved-plant-item[data-tier="common"] .saved-plant-name {
+  color: #b0b0b0;
+}
+
+.saved-plant-item[data-tier="uncommon"] .saved-plant-name {
+  color: #7dd87f;
+}
+
+.saved-plant-item[data-tier="rare"] .saved-plant-name {
+  color: #64b5f6;
+}
+
+.saved-plant-item[data-tier="legendary"] .saved-plant-name {
+  color: #f48fb1;
+}
+
+.saved-plant-item[data-tier="mythical"] .saved-plant-name {
+  color: #b39ddb;
+}
+
+.saved-plant-item[data-tier="divine"] .saved-plant-name {
+  color: #ffb74d;
+}
+
+.saved-plant-item[data-tier="prismatic"] .saved-plant-name {
+  background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
 }
 
 #fruit-select {
@@ -131,76 +329,58 @@ input:focus, select:focus {
   box-shadow: 0 0 0 2px rgba(125, 216, 127, 0.4);
 }
 
-.crop-item img {
-  width: 32px;
-  height: 32px;
-  margin-bottom: 0.3rem;
-  border-radius: 50%;
-  background: #3a3a50;
-  border: 1px solid #4a5568;
-}
-
 .crop-item span:first-of-type {
   font-weight: 600;
   margin-bottom: 0.2rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .tier-indicator {
-  font-size: 0.7rem !important;
-  font-weight: 500 !important;
-  padding: 0.1rem 0.4rem;
-  border-radius: 12px;
-  margin-top: 0.2rem !important;
-  margin-bottom: 0 !important;
+  font-size: 0 !important; /* hide text */
+  padding: 0 !important;
+  border: none !important;
+  background-color: transparent;
+  width: 80px;
+  height: 20px;
+  display: block;            /* avoid inline baseline gap */
+  margin: 0.1rem auto 0;     /* small top space, no bottom padding, centered */
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  line-height: 0;
 }
 
-/* Tier color coding */
-.tier-indicator:contains("Common") {
-  background: #4a4a4a;
-  color: #b0b0b0;
-}
+/* Icon slot for tier indicator */
+.tier-indicator::before { display: none; }
 
-.crop-item:has(.tier-indicator:contains("Common")) .tier-indicator {
-  background: #4a4a4a;
-  color: #b0b0b0;
+/* Tier color coding for crop list (attribute selectors; widely supported) */
+.crop-item[data-tier="common"] .tier-indicator {
+  background: transparent;
 }
+.crop-item[data-tier="common"] .tier-indicator { background-image: url('data/Common.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Uncommon")) .tier-indicator {
-  background: #2d5a2f;
-  color: #7dd87f;
-}
+.crop-item[data-tier="uncommon"] .tier-indicator { background: transparent; background-image: url('data/Uncommon.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Rare")) .tier-indicator {
-  background: #1e3a5f;
-  color: #64b5f6;
-}
+.crop-item[data-tier="rare"] .tier-indicator { background: transparent; background-image: url('data/Rare.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Legendary")) .tier-indicator {
-  background: #5d2a4a;
-  color: #f48fb1;
-}
+.crop-item[data-tier="legendary"] .tier-indicator { background: transparent; background-image: url('data/Legendary.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Mythical")) .tier-indicator {
-  background: #3d2d5a;
-  color: #b39ddb;
-}
+.crop-item[data-tier="mythical"] .tier-indicator { background: transparent; background-image: url('data/Mythical.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Divine")) .tier-indicator {
-  background: #5a3d1e;
-  color: #ffb74d;
-}
+.crop-item[data-tier="divine"] .tier-indicator { background: transparent; background-image: url('data/Divine.webp'); background-size: contain; background-repeat: no-repeat; }
 
-.crop-item:has(.tier-indicator:contains("Prismatic")) .tier-indicator {
-  background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
-  color: white;
-  font-weight: 600;
+.crop-item[data-tier="prismatic"] .tier-indicator {
+  background: transparent;
 }
+.crop-item[data-tier="prismatic"] .tier-indicator { background-image: url('data/Prismatic.webp'); background-size: contain; background-repeat: no-repeat; }
+
+/* Optional: Transcendent tier icon */
+.crop-item[data-tier="transcendent"] .tier-indicator { background-image: url('data/Transcendent.webp'); background-size: contain; background-repeat: no-repeat; }
 
 .mutations-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
   padding: 0.5rem;
   border: 1px solid #4a5568;
   border-radius: 7px;
@@ -211,30 +391,51 @@ input:focus, select:focus {
 .mutation-item {
   display: flex;
   align-items: center;
-  padding: 0.25rem 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
   background: #404060;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.9rem;
+  font-weight: 600;
   transition: all 0.2s;
-  border: 1px solid transparent;
+  border: 2px solid #4a5568;
   color: #e0e0e0;
+  user-select: none;
+}
+
+.mutation-item .mut-name {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: center;
+}
+
+.mutation-item .mut-multi {
+  white-space: nowrap;
+  margin-left: 0.25rem;
 }
 
 .mutation-item:hover {
   background: #505070;
-  border-color: #4a5568;
-}
-
-.mutation-item input:checked + span {
-  color: #7dd87f;
-  font-weight: 600;
+  border-color: #7dd87f;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .mutation-item input {
   margin-right: 0.3rem;
   accent-color: #7dd87f;
+  display: none;
+}
+
+.mutation-item.selected {
+  background: #5a7c5c;
+  border-color: #7dd87f;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(125, 216, 127, 0.3);
 }
 
 .calc-btn {
@@ -392,16 +593,449 @@ h1 {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
+/* New Layout Styles */
+.controls-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #3a3a50;
+  border-radius: 10px;
+  border: 1px solid #4a5568;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.control-group label {
+  font-size: 0.9rem;
+  color: #b0b0b0;
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.control-group input[type="number"] {
+  background: #2a2a40;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  padding: 0.6rem;
+  color: #e0e0e0;
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #4a5568;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4ecdc4;
+  cursor: pointer;
+  border: 2px solid #2a2a40;
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4ecdc4;
+  cursor: pointer;
+  border: 2px solid #2a2a40;
+}
+
+.slider-value {
+  font-size: 0.9rem;
+  color: #4ecdc4;
+  font-weight: 600;
+  min-width: 35px;
+}
+
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.toggle {
+  display: none;
+}
+
+.toggle-label {
+  width: 40px;
+  height: 20px;
+  background: #4a5568;
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggle-label::after {
+  content: '';
+  width: 16px;
+  height: 16px;
+  background: #e0e0e0;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+}
+
+.toggle:checked + .toggle-label {
+  background: #4ecdc4;
+}
+
+.toggle:checked + .toggle-label::after {
+  transform: translateX(20px);
+}
+
+.reset-btn {
+  background: #404060;
+  color: #e0e0e0;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  background: #505070;
+  border-color: #7dd87f;
+}
+
+.total-value-section,
+.reverse-calculator-section {
+  background: #2a2a40;
+  border-radius: 10px;
+  border: 1px solid #404060;
+  padding: 1.5rem;
+  text-align: left;
+  margin: 2rem 0;
+}
+
+.total-value-header,
+.reverse-calc-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: #b0b0b0;
+  margin-bottom: 1.5rem;
+}
+
+.calculator-icon {
+  font-size: 1.2rem;
+}
+
+.total-value-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #4ecdc4;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.currency {
+  font-size: 2rem;
+  color: #ffb74d;
+}
+
+.total-value-subtitle {
+  font-size: 1rem;
+  color: #4ecdc4;
+  opacity: 0.8;
+  margin-left: 0.5rem;
+}
+
+.details-section {
+  background: #3a3a50;
+  border-radius: 10px;
+  border: 1px solid #4a5568;
+  padding: 1.5rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid #4a5568;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.active-mutations {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.active-mutations-list {
+  color: #4ecdc4;
+  font-weight: 500;
+}
+
+.detail-label {
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.detail-value {
+  color: #4ecdc4;
+  font-weight: 600;
+}
+
+.valuation-details {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.plant-details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.plant-icon {
+  font-size: 1.2rem;
+}
+
+.plant-name {
+  color: #b39ddb;
+  font-weight: 600;
+}
+
+.plant-weight, .plant-worth {
+  color: #b0b0b0;
+}
+
+.plant-worth span {
+  color: #4ecdc4;
+  font-weight: 600;
+}
+
+.mutation-controls {
+  background: #3a3a50;
+  border-radius: 10px;
+  border: 1px solid #4a5568;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* New mutation category styles */
+.mutation-categories-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.mutation-category {
+  background: #23233a;
+  border-radius: 10px;
+  padding: 1rem;
+  flex: 1;
+}
+
+.mutation-category-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.category-icon {
+  font-size: 1.2rem;
+  margin-right: 0.5rem;
+}
+
+.category-title {
+  font-weight: 600;
+  color: #e0e0e0;
+  font-size: 1.1rem;
+}
+
+/* Removed duplicate declaration */
+
+.mutation-button {
+  background: #252538;
+  border: 1px solid #4a5568;
+  border-radius: 6px;
+  color: #e0e0e0;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.mutation-button:hover {
+  background: #4a4a60;
+  border-color: #7dd87f;
+}
+
+.mutation-button.active {
+  background: #5a7c5c;
+  border-color: #7dd87f;
+  color: #fff;
+}
+
+/* Growth mutations specific */
+.growth-mutations .mutation-button.active {
+  background: #5a7c5c;
+  border-color: #7dd87f;
+  color: white;
+}
+
+/* Temperature mutations specific */
+.temperature-mutations .mutation-button.active {
+  background: #4a6a8a;
+  border-color: #64b5f6;
+  color: white;
+}
+
+.mutation-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+}
+
+/* Reverse Calculator Styles */
+.reverse-calc-description {
+  color: #b0b0b0;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.reverse-calc-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.reverse-calc-controls .control-group {
+  flex: 1;
+}
+
+.reverse-calc-btn {
+  width: auto;
+  padding: 0.6rem 1.2rem;
+  margin-top: 0;
+  font-size: 0.95rem;
+}
+
+.reverse-calc-result {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.result-label {
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.result-value {
+  color: #4ecdc4;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .app-container {
+    flex-direction: column;
+  }
+  
+  main {
+    max-width: 100%;
+    max-height: calc(100vh - 300px);
+  }
+  
+  .saved-plants-sidebar {
+    width: 100%;
+    height: 300px;
+    border-left: none;
+    border-top: 1px solid #404060;
+  }
+  
+  .saved-plants-list {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 1rem;
+  }
+  
+  .saved-plant-item {
+    min-width: 250px;
+    margin-right: 0.75rem;
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .controls-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  .mutation-categories-row {
+    flex-direction: column;
+  }
+  
+  .mutation-category {
+    margin-bottom: 1rem;
+  }
+
+  .reverse-calc-controls {
+    flex-direction: column;
+  }
+
+  .reverse-calc-btn {
+    width: 100%;
+  }
+}
+
 @media (max-width: 700px) {
   main {
     padding: 1rem;
     margin: 1rem;
-    max-width: calc(100% - 2rem);
   }
 
-  .grid {
+  .controls-row {
     grid-template-columns: 1fr;
-    gap: 0.7rem;
+    gap: 1rem;
+    padding: 1rem;
   }
 
   .crop-list {
@@ -412,8 +1046,11 @@ h1 {
     padding: 0.4rem;
   }
 
-  .crop-item img {
-    width: 28px;
-    height: 28px;
+  .total-value-amount {
+    font-size: 2.5rem;
+  }
+
+  .currency {
+    font-size: 2rem;
   }
 }
