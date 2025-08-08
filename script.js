@@ -13,6 +13,15 @@ function getRgbStringForMutation(name) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function renderColoredMutationToken(name) {
+  const color = getRgbStringForMutation(name);
+  const displayName = name;
+  if (color) {
+    return `<span class="overlay-mutation" data-name="${displayName}" style="color: ${color}">${displayName}</span>`;
+  }
+  return `<span class="overlay-mutation" data-name="${displayName}">${displayName}</span>`;
+}
+
 // Tracks the last mutation the user actively clicked to guide exclusivity resolution
 let lastMutationClicked = null;
 let suppressLastClicked = false;
@@ -25,6 +34,7 @@ function isShowUnreleased() {
 // --- Growth mutation visuals (Golden/Rainbow) ---
 let rainbowAnimId = null;
 let rainbowHue = 0; // [0,1)
+let rainbowAnimIdOverlay = null; // separate animation for overlay token
 
 function hsvToRgb(h, s, v) {
   const i = Math.floor(h * 6);
@@ -62,6 +72,25 @@ function startRainbowAnimation(targetEl) {
     rainbowAnimId = requestAnimationFrame(tick);
   }
   rainbowAnimId = requestAnimationFrame(tick);
+}
+
+function stopRainbowAnimationOverlay() {
+  if (rainbowAnimIdOverlay != null) cancelAnimationFrame(rainbowAnimIdOverlay);
+  rainbowAnimIdOverlay = null;
+}
+
+function startRainbowAnimationOverlay(targetEl) {
+  stopRainbowAnimationOverlay();
+  let lastTs = performance.now();
+  function tick(now) {
+    const dt = Math.max(0, (now - lastTs) / 1000);
+    lastTs = now;
+    rainbowHue = (rainbowHue + dt * 0.2) % 1;
+    const [r, g, b] = hsvToRgb(rainbowHue, 1, 1);
+    targetEl.style.color = `rgb(${r}, ${g}, ${b})`;
+    rainbowAnimIdOverlay = requestAnimationFrame(tick);
+  }
+  rainbowAnimIdOverlay = requestAnimationFrame(tick);
 }
 
 function applyGrowthVisuals() {
@@ -289,7 +318,7 @@ function buildMutationItems(orderArray) {
       checkbox.checked = !checkbox.checked;
       enforceMutationCombos();
       refreshMutationSelectionClasses();
-      updateCalculation();
+          updateCalculation();
       updateMaxToggleVisual();
     };
     label.addEventListener("click", (e) => {
@@ -772,6 +801,7 @@ function updateCalculation() {
   const plantWorthEl = document.getElementById("plantWorth");
   const plantIconEl = document.querySelector(".plant-icon");
   const activeMutationsListEl = document.getElementById("activeMutationsList");
+  const hoverOverlayEl = document.getElementById("hoverOverlayText");
   
   if (!selectedPlant) {
     // Set default display when no plant selected
@@ -782,6 +812,7 @@ function updateCalculation() {
     if (displayWeightEl) displayWeightEl.textContent = "0";
     if (plantWorthEl) plantWorthEl.textContent = "0 Sheckles";
     if (activeMutationsListEl) activeMutationsListEl.textContent = "None";
+    if (hoverOverlayEl) hoverOverlayEl.textContent = "";
     return;
   }
   
@@ -852,28 +883,48 @@ function updateCalculation() {
     plantIconEl.textContent = "🌱";
   }
   
+  // Build list of active mutations once
+  // Order temperature + environmental mutations to match current list order
+  const sortMode = document.getElementById("mutationSort")?.value || "display";
+  let orderList = getSortedMutationOrder(sortMode);
+  if (mutationSortReversed) orderList = orderList.slice().reverse();
+  const selectedSet = new Set([...(temperature ? [temperature] : []), ...envMutations]);
+  const orderedSelected = orderList.filter((n) => selectedSet.has(n));
+
+  const allMutations = [];
+  if (growth !== "none") {
+    allMutations.push(growth === "golden" ? "Golden" : "Rainbow");
+  }
+  allMutations.push(...orderedSelected);
+
   // Update active mutations list
   if (activeMutationsListEl) {
-    // Get all active mutations
-    const allMutations = [];
-    
-    // Add growth mutation if not "none"
-    if (growth !== "none") {
-      allMutations.push(growth === "golden" ? "Golden" : "Rainbow");
-    }
-    
-    // Add temperature mutation if present
-    if (temperature) {
-      allMutations.push(temperature);
-    }
-    
-    // Add environmental mutations
-    allMutations.push(...envMutations);
-    
-    // Display the list or "None"
     activeMutationsListEl.textContent = allMutations.length > 0 
       ? allMutations.join(" + ") 
       : "None";
+  }
+
+  // Update hover-style overlay text under mutations list
+  if (hoverOverlayEl) {
+    const mutationLineHtml = allMutations.length > 0 
+      ? allMutations.map(renderColoredMutationToken).join(" <span class=\"overlay-sep\">•</span> ")
+      : "None";
+    hoverOverlayEl.innerHTML = `
+      <div class="overlay-plant-name">${selectedPlant.name}</div>
+      <div class="overlay-mutations">${mutationLineHtml}</div>
+      <div class="overlay-value">${formatThousands(totalValue)}¢</div>
+    `;
+
+    // Apply growth visuals on overlay token when present
+    const growthToken = hoverOverlayEl.querySelector('.overlay-mutation[data-name="Golden"], .overlay-mutation[data-name="Rainbow"]');
+    if (growth === 'golden' || growth === 'gold') {
+      stopRainbowAnimationOverlay();
+      if (growthToken) growthToken.style.color = '#FFD700';
+    } else if (growth === 'rainbow') {
+      if (growthToken) startRainbowAnimationOverlay(growthToken);
+    } else {
+      stopRainbowAnimationOverlay();
+    }
   }
   
   // Save current state to localStorage
@@ -930,7 +981,7 @@ function applyMaxMutations() {
   let filteredMutations = sortedMutations.filter(name => !tempMutationSet.has(name));
   // Respect unreleased visibility
   filteredMutations = filteredMutations.filter(name => !(unreleasedFlags?.[name] && !isShowUnreleased()));
-
+  
   // Bulk-select all non-temp mutations, including Sandy
   filteredMutations.forEach(name => {
     const checkbox = document.getElementById(`mut-${name}`);
@@ -1251,7 +1302,7 @@ function renderSavedPlants() {
       value = Math.round(value);
       if (CAP_AT_1E12) value = Math.min(value, 1e12);
 
-      clone.querySelector(".saved-plant-value").textContent = 
+    clone.querySelector(".saved-plant-value").textContent = 
         `${formatNumber(value)} (${formatThousands(value)})`;
     } else {
       clone.querySelector(".saved-plant-value").textContent = "0";
@@ -1314,7 +1365,7 @@ function calculateWeightFromValue(targetValue, plantData, settings = {}) {
   const e = 1 + tempStack + otherStacks;
   const friendMulti = 1 + (Number(friendBoost) / 100);
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
-
+  
   const perCropTarget = Math.max(1, targetValue / (friendMulti * qty));
   const baseFactor = baseValue * growthMulti * e;
   if (baseFactor <= 0) return 0;
@@ -1500,7 +1551,7 @@ function initReverseCalculator() {
     
     // Calculate required weight (exact, no rounding)
     const requiredWeight = calculateWeightFromValue(targetValue, selectedPlant, settings);
-
+    
     // Write exact value into the main Weight input and recalc
     const weightInput = document.getElementById("weight");
     if (weightInput) {
@@ -1530,23 +1581,23 @@ function initializeApp() {
   // Initialize core components first
   initCrops();
   initMutations();
-
+  
   // Then initialize new controls
   initNewControls();
-
+  
   // Initialize save system
   initSaveSystem();
-
+  
   // Initialize reverse calculator
   initReverseCalculator();
-
+  
   // Add direct event listener to weight input
   const weightInput = document.getElementById("weight");
   if (weightInput) {
     weightInput.addEventListener("input", function() { updateCalculation(); });
     weightInput.addEventListener("change", function() { updateCalculation(); });
   }
-
+  
   // Add event listeners to mutation checkboxes after they're created
   setTimeout(() => {
     mutationOrder.forEach((name) => {
@@ -1555,10 +1606,10 @@ function initializeApp() {
     checkbox.addEventListener("change", () => { enforceMutationCombos(); updateCalculation(); updateMaxToggleVisual(); });
       }
     });
-
+    
     // Add event listener to growth select
     const growthSelect = document.getElementById("growth");
-      if (growthSelect) {
+    if (growthSelect) {
         growthSelect.addEventListener("change", () => { updateCalculation(); updateMaxToggleVisual(); applyGrowthVisuals(); });
       }
   }, 100);
