@@ -1,14 +1,12 @@
 export const mutationOrder = [
-  "Eclipsed", "Meteoric", "Fried", "Drenched", "Tempestuous", "Shocked", "Aurora", "Choc",
-  "Bloodlit", "Spaghetti", "Sliced", "Verdant", "Infected", "AncientAmber", "Twisted",
-  "Alienlike", "FoxfireChakra", "CorruptChakra", "Cooked", "Chilled", "Heavenly",
-  "Radioactive", "Celestial", "Windstruck", "Burnt", "Wet", "Friendbound", "Paradisal",
-  "Clay", "Amber", "Lightcycle", "HoneyGlazed", "Frozen", "Corrupt", "OldAmber", "Subzero",
-  "Touchdown", "Disco", "Sandy", "Sauce", "Moonlit", "Jackpot", "Cloudtouched", "Toxic",
-  "Tranquil", "Enlightened", "Meatball", "CorruptFoxfireChakra", "HarmonisedFoxfireChakra",
-  "HarmonisedChakra", "Static", "Pasta", "Chakra", "Plasma", "Molten", "Dawnbound",
-  "Ceramic", "Wiltproof", "Pollinated", "Zombified", "Blitzshock", "Sundried", "Voidtouched",
-  "Galactic", "Acidic"
+  "Eclipsed", "Meteoric", "Fried", "Drenched", "Tempestuous", "Shocked", "Aurora", "Choc", "Bloodlit", "Spaghetti", 
+  "Sliced", "Verdant", "Infected", "Junkshock", "AncientAmber", "Twisted", "Alienlike", "FoxfireChakra", 
+  "CorruptChakra", "Cooked", "Chilled", "Heavenly", "Radioactive", "Aromatic", "Boil", "Celestial", "Windstruck", 
+  "Burnt", "Wet", "Friendbound", "Paradisal", "Lightcycle", "Clay", "Amber", "Subzero", "HoneyGlazed", "Frozen", 
+  "Corrupt", "OldAmber", "Touchdown", "Disco", "Jackpot", "Sandy", "Sauce", "Moonlit", "Oil", "Cloudtouched", 
+  "Toxic", "Tranquil", "Enlightened", "Meatball", "CorruptFoxfireChakra", "HarmonisedFoxfireChakra", "HarmonisedChakra", 
+  "Static", "Pasta", "Chakra", "Plasma", "Molten", "Dawnbound", "Ceramic", "Wiltproof", "Pollinated", 
+  "Zombified", "Blitzshock", "Sundried", "Voidtouched", "Galactic", "Acidic"
 ];
 
 export const mutationMultipliers = {
@@ -22,7 +20,8 @@ export const mutationMultipliers = {
   Tranquil: 20, Enlightened: 120, Meatball: 3, CorruptFoxfireChakra: 25,
   HarmonisedFoxfireChakra: 190, HarmonisedChakra: 35, Static: 8, Pasta: 4, Chakra: 15,
   Plasma: 5, Molten: 25, Dawnbound: 150, Ceramic: 30, Wiltproof: 4, Pollinated: 3,
-  Zombified: 25, Blitzshock: 50, Sundried: 85, Voidtouched: 135, Galactic: 120, Acidic: 6
+  Zombified: 25, Blitzshock: 50, Sundried: 85, Voidtouched: 135, Galactic: 120, Acidic: 6,
+  Aromatic: 15, Boil: 15, Oil: 15, Junkshock: 45
 };
 
 // Optional: mark mutations as unreleased/hidden by default in the UI list.
