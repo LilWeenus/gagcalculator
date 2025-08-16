@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grow a Garden — Pets</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' ry='12' fill='%232a2a40'/><circle cx='32' cy='38' r='10' fill='%234ecdc4'/><path d='M32 38c0-8 6-14 14-14-2 6-8 8-14 8-6 0-12-2-14-8 8 0 14 6 14 14z' fill='%237dd87f'/></svg>" />
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="stylesheet" href="pets.css" />
+</head>
+<body>
+  <div class="app-container">
+    <main>
+      <nav style="margin: 0 0 1rem; text-align:center">
+        <a href="../index.html" style="color:#7dd87f; text-decoration: none; font-weight: 600">← Back to Plants</a>
+      </nav>
+      
+      <!-- Pet selection (top) -->
+      <section id="pet-select" class="pets-panel">
+        <label for="petSearch">🐾 Select Pet:</label>
+        <input type="text" id="petSearch" placeholder="Search pets by name..." />
+        
+        <!-- Sort Controls -->
+        <div class="pets-sort-controls">
+          <label for="petSort">Sort by:</label>
+          <select id="petSort" class="pets-sort-select">
+            <option value="rarity">Rarity</option>
+            <option value="name">A-Z</option>
+          </select>
+        </div>
+        
+        <div id="petList" class="pets-grid"></div>
+      </section>
+
+      <!-- Pet infobox (below list) -->
+      <section id="petInfobox" class="pets-infobox" style="display: none;">
+        <div class="pets-infobox-header">
+          <div class="pets-infobox-image">
+            <img id="infoboxImage" src="" alt="" />
+          </div>
+          <div class="pets-infobox-title">
+            <div id="infoboxName" class="pets-infobox-name"></div>
+            <div id="infoboxRarity" class="pets-infobox-rarity"></div>
+          </div>
+        </div>
+        <div class="pets-infobox-content">
+          <div id="infoboxDescription" class="pets-description"></div>
+
+          <div class="pets-passives-list">
+            <div class="pets-passives-title">Passives:</div>
+            <div id="infoboxPassives"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Simulate (below infobox) -->
+      <section id="petSimulate" class="pets-simulate" style="display: none;">
+        <div class="pets-simulate-header">Simulate</div>
+        <div class="pets-simulate-content">
+          <!-- Age scale bar (spans full width) -->
+          <div class="pets-age-scale-container">
+            <label for="ageScale">Age Scale (1-100): <span id="ageScaleValue">1</span></label>
+            <input type="range" id="ageScale" min="1" max="100" value="1" class="pets-age-scale-full" />
+          </div>
+          <div class="pets-simulate-grid">
+            <!-- Controls -->
+            <div class="pets-controls">
+              <div class="pets-control-group">
+                <label for="simLevel">Level (Age)</label>
+                <input type="number" id="simLevel" min="1" max="100" value="1" />
+
+              </div>
+              
+              <div class="pets-control-group">
+                <label for="simWeight">Weight (kg)</label>
+                <input type="number" id="simWeight" step="0.01" value="1.5" placeholder="1.5" />
+              </div>
+              
+              <div class="pets-control-group">
+                <label>Mutations</label>
+                <div class="pets-mutation-buttons">
+                  <button type="button" class="pets-mutation-btn" id="simNone" data-value="none">None</button>
+                  <button type="button" class="pets-mutation-btn" id="simGold" data-value="gold">Gold</button>
+                  <button type="button" class="pets-mutation-btn" id="simRainbow" data-value="rainbow">Rainbow</button>
+                </div>
+              </div>
+              
+              <button id="simRecalc" class="pets-recalc-btn">Calculate</button>
+            </div>
+            
+            <!-- Weight Table (hidden until Calculate is clicked) -->
+            <div id="weightTableContainer" class="pets-weight-table" style="display: none;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Age</th>
+                    <th>Weight (kg)</th>
+                  </tr>
+                </thead>
+                <tbody id="weightTableBody">
+                  <!-- Populated by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- Results -->
+          <div id="simResults" class="pets-results">
+            <div class="pets-results-title">Results:</div>
+            <div id="simResultsContent"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+    
+    <!-- Saved Pets Sidebar -->
+    <aside class="saved-pets-sidebar">
+      <div class="sidebar-header">
+        <h3>Saved Pets</h3>
+        <div class="save-controls">
+          <input type="text" id="saveNameInput" placeholder="Name your pet setup..." />
+          <button id="saveCurrentBtn" class="save-btn">💾 Save</button>
+        </div>
+      </div>
+      <div class="saved-pets-list" id="savedPetsList">
+        <!-- Saved pets will be added here dynamically -->
+        <div class="empty-state">No saved pets yet</div>
+      </div>
+      <div class="sidebar-footer">
+        <button id="exportSavesBtn" class="export-btn">⬇️ Export</button>
+        <button id="importSavesBtn" class="import-btn">⬆️ Import</button>
+        <input type="file" id="importFileInput" accept=".json" style="display: none;" />
+      </div>
+    </aside>
+  </div>
+  
+  <!-- Templates -->
+  <template id="savedPetTemplate">
+    <div class="saved-pet-item">
+      <div class="saved-pet-header">
+        <span class="saved-pet-name"></span>
+        <div class="saved-pet-actions">
+          <button class="load-btn" title="Load this setup">📂</button>
+          <button class="update-btn" title="Update with current settings">💾</button>
+          <button class="delete-btn" title="Delete this setup">🗑️</button>
+        </div>
+      </div>
+      <div class="saved-pet-details">
+        <span class="saved-pet-icon">🐾</span>
+        <span class="saved-pet-info"></span>
+        <span class="saved-pet-weight"></span>
+      </div>
+    </div>
+  </template>
+  
+  <script>
+    (function() {
+      var bust = Date.now();
+      var s = document.createElement('script');
+      s.type = 'module';
+      s.src = 'pets.js?v=' + bust;
+      document.body.appendChild(s);
+    })();
+  </script>
+</body>
+</html>
+
+

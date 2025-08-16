@@ -97,8 +97,6 @@ export const plants = [
   { id: "peach", name: "Peach", baseValue: 300, baseWeight: 2, tier: "Rare" },
   { id: "papaya", name: "Papaya", baseValue: 1000, baseWeight: 3, tier: "Rare" },
   { id: "passionfruit", name: "Passionfruit", baseValue: 3550, baseWeight: 3, tier: "Rare" },
-  { id: "soul-fruit", name: "Soul Fruit", baseValue: 7750, baseWeight: 25, tier: "Robux" },
-  { id: "cursed-fruit", name: "Cursed Fruit", baseValue: 25750, baseWeight: 30, tier: "Robux" },
   { id: "cranberry", name: "Cranberry", baseValue: 3500, baseWeight: 1, tier: "Rare" },
   { id: "durian", name: "Durian", baseValue: 7500, baseWeight: 8, tier: "Common" },
   { id: "eggplant", name: "Eggplant", baseValue: 12000, baseWeight: 5, tier: "Mythical" },

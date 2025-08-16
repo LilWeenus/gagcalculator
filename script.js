@@ -1,11 +1,417 @@
 import { mutationOrder, mutationMultipliers, mutationColors, unreleasedFlags, showUnreleasedDefault } from './data/mutations.js';
 import { plants } from './data/plants.js';
 
-// --- UI Logic --- hi
+// ================================================================
+// CONFIGURATION AND CALCULATION ENGINE
+// ================================================================
+// Edit these values to modify game calculations and behavior
 
-// Temperature mutations (exclusive group in UI)
-const TEMPS = ["Wet", "Chilled", "Drenched", "Frozen"];
+// --- Core Configuration ---
+const CONFIG = {
+  ANIMATION: {
+    RAINBOW_CYCLE_SPEED: 0.2, // 5s full cycle (higher = faster)
+    GOLDEN_COLOR: "#FFD700"
+  },
+  CALCULATION: {
+    CAP_AT_1E12: false,        // Set to true to cap values at 1 trillion
+    MIN_WEIGHT_RATIO: 0.95,    // Minimum weight multiplier (price floor)
+    PRICE_FLOOR_RATIO: 0.95    // Default weight ratio for plants
+  },
+  GROWTH_MULTIPLIERS: { 
+    none: 1, 
+    golden: 20,
+    rainbow: 50 
+  },
+  TEMPERATURE_MUTATIONS: ["Wet", "Chilled", "Drenched", "Frozen"]
+};
 
+// Legacy aliases for compatibility
+const TEMPS = CONFIG.TEMPERATURE_MUTATIONS;
+const CAP_AT_1E12 = CONFIG.CALCULATION.CAP_AT_1E12;
+
+// --- Mutation Processing ---
+// Convert multipliers to "stacks" = (multiplier - 1) for additive calculation
+const stacksEnv = Object.fromEntries(
+  Object.entries(mutationMultipliers).map(([name, multi]) => [name, (Number(multi) || 1) ])
+);
+
+// Split out temperature stacks for easy access
+const stacksTemp = Object.fromEntries(
+  TEMPS.map(t => [t, stacksEnv[t] || 0])
+);
+
+// --- Mutation Combo System ---
+// Define how mutations combine and interact
+const COMBO_RULES = {
+  // Exclusive groups (only one can be active at a time)
+  exclusiveGroups: [
+    ["AncientAmber", "OldAmber", "Amber"],
+    ["Cooked", "Burnt"]
+    // Note: Temperature mutations are handled by combo system, not exclusivity
+  ],
+  
+  // Combination recipes: [requirements] -> result (removes components)
+  combinations: [
+    { requires: [["Drenched", "Wet"], ["Chilled"]], result: "Frozen", removes: ["Drenched", "Wet", "Chilled"] },
+    { requires: [["Verdant"], ["Sundried"]], result: "Paradisal", removes: ["Verdant", "Sundried"] },
+    { requires: [["Drenched", "Wet"], ["Sandy"]], result: "Clay", removes: ["Drenched", "Wet", "Sandy"] },
+    { requires: [["Clay"], ["Burnt", "Fried", "Cooked", "Molten", "Sundried", "Meteoric", "Plasma"]], result: "Ceramic", removes: ["Burnt", "Fried", "Cooked", "Clay"] },
+    { requires: [["Windstruck"], ["Twisted"]], result: "Tempestuous", removes: ["Windstruck", "Twisted"] },
+    { requires: [["Chakra"], ["CorruptChakra"]], result: "HarmonisedChakra", removes: ["Chakra", "CorruptChakra"] },
+    { requires: [["FoxfireChakra"], ["CorruptFoxfireChakra"]], result: "HarmonisedFoxfireChakra", removes: ["FoxfireChakra", "CorruptFoxfireChakra"] },
+    { requires: [["Pasta"], ["Sauce"], ["Meatball"]], result: "Spaghetti", removes: ["Pasta", "Sauce", "Meatball"] }
+  ]
+};
+
+// Legacy alias for compatibility
+const EXCLUSIVE_GROUPS = COMBO_RULES.exclusiveGroups;
+
+// --- Max Mutation Set Calculator ---
+// Computes the optimal mutation selection for maximum value
+function computeMaxMutationSet() {
+  const result = new Set();
+  
+  // Add highest temperature by multiplier
+  let bestTemp = null;
+  let bestTempVal = -Infinity;
+  for (const t of TEMPS) {
+    if (unreleasedFlags?.[t] && !isShowUnreleased()) continue;
+    const v = Number(mutationMultipliers[t]) || 0;
+    if (v > bestTempVal) { bestTempVal = v; bestTemp = t; }
+  }
+  if (bestTemp) result.add(bestTemp);
+  
+  // Get all available mutations (excluding temps, handled above)
+  const allMutations = mutationOrder.filter(name => {
+    if (TEMPS.includes(name)) return false;
+    if (unreleasedFlags?.[name] && !isShowUnreleased()) return false;
+    return true;
+  });
+  
+  // Build map of combo results to their components for smart selection
+  const comboComponentMap = new Map(); // result -> [components]
+  const comboResultMap = new Map();    // component -> result
+  
+  COMBO_RULES.combinations.forEach(combo => {
+    // Skip if result is unreleased and we're not showing unreleased
+    if (unreleasedFlags?.[combo.result] && !isShowUnreleased()) return;
+    
+    const components = combo.removes.filter(comp => allMutations.includes(comp));
+    if (components.length > 0) {
+      comboComponentMap.set(combo.result, components);
+      components.forEach(comp => comboResultMap.set(comp, combo.result));
+    }
+  });
+  
+  // Smart mutation selection: prefer combo results if they're better than components
+  const toAdd = new Set(allMutations);
+  const toRemove = new Set();
+  
+  // For each combo, decide whether to use the combo result or individual components
+  comboComponentMap.forEach((components, comboResult) => {
+    if (!allMutations.includes(comboResult)) return;
+    
+    const comboValue = Number(mutationMultipliers[comboResult]) || 1;
+    const componentValues = components.map(comp => Number(mutationMultipliers[comp]) || 1);
+    const componentSum = componentValues.reduce((sum, val) => sum + val, 0);
+    
+    // If combo result is better than sum of components, use combo
+    if (comboValue >= componentSum) {
+      toAdd.add(comboResult);
+      components.forEach(comp => toRemove.add(comp));
+    }
+    // Otherwise keep individual components and remove combo result
+    else {
+      toRemove.add(comboResult);
+    }
+  });
+  
+  // Apply the smart selections
+  toAdd.forEach(mutation => {
+    if (!toRemove.has(mutation)) result.add(mutation);
+  });
+  
+  // Handle exclusive groups by picking the highest value from each group
+  COMBO_RULES.exclusiveGroups.forEach(group => {
+    const available = group.filter(name => {
+      if (unreleasedFlags?.[name] && !isShowUnreleased()) return false;
+      return allMutations.includes(name) || result.has(name);
+    });
+    
+    if (available.length > 1) {
+      // Find the highest value mutation in this group
+      let best = null;
+      let bestValue = -Infinity;
+      available.forEach(name => {
+        const value = Number(mutationMultipliers[name]) || 1;
+        if (value > bestValue) {
+          bestValue = value;
+          best = name;
+        }
+      });
+      
+      // Remove all others from this group
+      available.forEach(name => {
+        if (name !== best) result.delete(name);
+      });
+      
+      // Add the best one
+      if (best) result.add(best);
+    }
+  });
+  
+  // Final combo processing to handle any remaining interactions
+  return ComboProcessor.applyCombos(result);
+}
+
+// --- Helper Functions ---
+function getActiveMutationsList(growth, temperature, envMutations) {
+  const sortMode = Utils.getElement("mutationSort")?.value || "display";
+  let orderList = getSortedMutationOrder(sortMode);
+  if (mutationSortReversed) orderList = orderList.reverse();
+  
+  const selectedSet = new Set([...(temperature ? [temperature] : []), ...envMutations]);
+  const orderedSelected = orderList.filter(n => selectedSet.has(n));
+  
+  const allMutations = [];
+  if (growth !== "none") allMutations.push(growth === "golden" ? "Golden" : "Rainbow");
+  allMutations.push(...orderedSelected);
+  
+  return allMutations;
+}
+
+// Preview display always uses display order (not affected by sort option)
+function getActiveMutationsListForPreview(growth, temperature, envMutations) {
+  // Always use display order for preview, regardless of sort settings
+  const orderList = getSortedMutationOrder("display");
+  
+  const selectedSet = new Set([...(temperature ? [temperature] : []), ...envMutations]);
+  const orderedSelected = orderList.filter(n => selectedSet.has(n));
+  
+  const allMutations = [];
+  if (growth !== "none") allMutations.push(growth === "golden" ? "Golden" : "Rainbow");
+  allMutations.push(...orderedSelected);
+  
+  return allMutations;
+}
+
+function isShowUnreleased() {
+  const el = document.getElementById('toggleUnreleased');
+  return el ? !!el.checked : !!showUnreleasedDefault;
+}
+
+// --- Combo Processing Engine ---
+// Unified combo processor that handles all mutation interactions
+const ComboProcessor = {
+  // Apply combos to a mutation set
+  applyCombos(mutations, options = {}) {
+    const { respectLastClicked = false, lastClicked = null, skipResults = new Set() } = options;
+    
+    // Apply exclusivity rules
+    COMBO_RULES.exclusiveGroups.forEach(group => {
+      const present = group.filter(n => mutations.has(n));
+      if (present.length > 1) {
+        const keep = (respectLastClicked && lastClicked && present.includes(lastClicked)) ? lastClicked : present[0];
+        group.forEach(n => { if (n !== keep) mutations.delete(n); });
+      }
+    });
+    
+    // Apply combination rules
+    COMBO_RULES.combinations.forEach(combo => {
+      if (skipResults.has(combo.result)) return;
+      
+      // If combo result is already present, remove conflicting components
+      if (mutations.has(combo.result)) {
+        combo.removes.forEach(n => mutations.delete(n));
+        return;
+      }
+      
+      // Check if all requirements are met
+      const requirementsMet = combo.requires.every(reqGroup => 
+        reqGroup.some(req => mutations.has(req))
+      );
+      
+      if (requirementsMet) {
+        combo.removes.forEach(n => mutations.delete(n));
+        mutations.add(combo.result);
+      }
+    });
+    
+    return mutations;
+  },
+  
+  // Get reverse combo rules for user interaction
+  getReverseRules() {
+    return COMBO_RULES.combinations.map(combo => ({
+      result: combo.result,
+      bases: combo.removes
+    }));
+  }
+};
+
+// --- Core Calculation Functions ---
+// The main crop value calculation that matches in-game logic
+function calculateCropValue({ baseValue, baseWeight, weightKg, growth, stacksAdditive, minWeight, numberOfMutations = 0 }) {
+  const safeBaseWeight = Math.max(1e-9, Number(baseWeight) || 1);
+  const minRatio = Math.max(0, Number(minWeight) ? (Number(minWeight) / safeBaseWeight) : CONFIG.CALCULATION.MIN_WEIGHT_RATIO);
+  const ratio = Math.max((Number(weightKg) || 0) / safeBaseWeight, minRatio);
+  const g = CONFIG.GROWTH_MULTIPLIERS[growth] ?? 1;
+  const e = 1 + (Number(stacksAdditive) || 0) - (Number(numberOfMutations) || 0);
+  const perCrop = (Number(baseValue) || 0) * g * e * ratio * ratio;
+  return perCrop; // rounding happens after friend boost & quantity
+}
+
+// Plant management and calculation utilities
+const PlantManager = {
+  // Helper function to derive constants for plants
+  getPlantConstants(plant) {
+    const baseValue = Number(plant.baseValue) || 0;
+    const baseWeight = Number(plant.baseWeight) || 1;
+    const minWeight = baseWeight * CONFIG.CALCULATION.PRICE_FLOOR_RATIO;
+    return { baseValue, baseWeight, minWeight };
+  },
+
+  // Set weight to price-floor weight for selected plant
+  setDefaultWeight(plant) {
+    const weightInput = Utils.getElement("weight");
+    if (weightInput && plant) {
+      const { baseWeight } = this.getPlantConstants(plant);
+      const priceFloorWeight = baseWeight * CONFIG.CALCULATION.PRICE_FLOOR_RATIO;
+      weightInput.value = priceFloorWeight.toFixed(2);
+    }
+  },
+
+  // Calculate weight needed to achieve target value
+  calculateWeightFromValue(targetValue, plantData, settings = {}) {
+    if (!plantData) return 0;
+    if (targetValue <= 0) return 0;
+
+    // Get plant constants
+    const { baseValue, baseWeight, minWeight } = this.getPlantConstants(plantData);
+
+    // Process settings to match site calculator format
+    const { quantity, friendBoost, growthMutation, mutations } = settings;
+    
+    // Split mutations into temperature and environmental
+    const temperature = TEMPS.find(t => mutations.includes(t)) || null;
+    const envMutations = mutations.filter(name => !TEMPS.includes(name));
+
+    // Convert growth mutation to the format expected by calculation
+    const growth = growthMutation || 'none';
+
+    // Rebuild additive stacks and growth
+    const growthMulti = CONFIG.GROWTH_MULTIPLIERS[growth] || 1;
+    const tempStack = temperature ? (Number(stacksTemp[temperature]) || 0) : 0;
+    const otherStacks = envMutations.reduce((sum, name) => sum + (Number(stacksEnv[name]) || 0), 0);
+    const numberOfMutations = (temperature ? 1 : 0) + envMutations.length;
+    const e = 1 + tempStack + otherStacks - numberOfMutations;
+    const friendMulti = 1 + (Number(friendBoost) / 100);
+    const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+    
+    const perCropTarget = Math.max(1, targetValue / (friendMulti * qty));
+    const baseFactor = baseValue * growthMulti * e;
+    if (baseFactor <= 0) return 0;
+
+    // perCrop = baseValue * g * e * (ratio^2)
+    // ratio^2 = perCrop / (baseValue * g * e)
+    const ratioSquared = perCropTarget / baseFactor;
+    const ratio = Math.max(Math.sqrt(Math.max(0, ratioSquared)), CONFIG.CALCULATION.MIN_WEIGHT_RATIO);
+    const weight = ratio * baseWeight;
+    return Math.max(weight, minWeight);
+  }
+};
+
+// --- Growth mutation visuals (Golden/Rainbow) ---
+let rainbowHue = 0; // [0,1) shared across all animations
+const rainbowAnimations = new Map(); // track multiple animations
+
+function hsvToRgb(h, s, v) {
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
+  let r = 0, g = 0, b = 0;
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function createRainbowAnimation(targetEl, animationId) {
+  // Stop existing animation for this ID
+  if (rainbowAnimations.has(animationId)) {
+    cancelAnimationFrame(rainbowAnimations.get(animationId));
+  }
+  
+  let lastTs = performance.now();
+  function tick(now) {
+    const dt = Math.max(0, (now - lastTs) / 1000);
+    lastTs = now;
+    rainbowHue = (rainbowHue + dt * CONFIG.ANIMATION.RAINBOW_CYCLE_SPEED) % 1;
+    const [r, g, b] = hsvToRgb(rainbowHue, 1, 1);
+    targetEl.style.color = `rgb(${r}, ${g}, ${b})`;
+    const frameId = requestAnimationFrame(tick);
+    rainbowAnimations.set(animationId, frameId);
+  }
+  const frameId = requestAnimationFrame(tick);
+  rainbowAnimations.set(animationId, frameId);
+}
+
+function stopRainbowAnimation(animationId) {
+  if (rainbowAnimations.has(animationId)) {
+    cancelAnimationFrame(rainbowAnimations.get(animationId));
+    rainbowAnimations.delete(animationId);
+  }
+}
+
+
+
+function applyGrowthVisuals() {
+  const growthSelect = document.getElementById("growth");
+  const value = growthSelect ? growthSelect.value : "none";
+  const buttons = document.querySelectorAll(".growth-mutations .mutation-button");
+  // Reset all button text colors and any animation
+  stopRainbowAnimation('growth-button');
+  buttons.forEach(btn => { btn.style.color = ""; });
+  const activeBtn = Array.from(buttons).find(b => b.classList.contains("active"));
+  if (!activeBtn) return;
+  if (value === "golden" || value === "gold") {
+    // Static Gold
+    activeBtn.style.color = CONFIG.ANIMATION.GOLDEN_COLOR;
+  } else if (value === "rainbow") {
+    // Animated Rainbow
+    createRainbowAnimation(activeBtn, 'growth-button');
+  }
+}
+
+
+
+function updateMaxToggleVisual() {
+  const toggle = document.getElementById("maxMutation");
+  if (!toggle) return;
+  const current = new Set(getSelectedMutations());
+  const expected = computeMaxMutationSet();
+  let equal = current.size === expected.size;
+  if (equal) {
+    for (const n of expected) { if (!current.has(n)) { equal = false; break; } }
+  }
+  toggle.checked = !!equal;
+}
+
+
+
+// ================================================================
+// USER INTERFACE AND INTERACTION LOGIC
+// ================================================================
+// UI-related functions, event handlers, and display logic
+
+// --- UI Helper Functions ---
 function getRgbStringForMutation(name) {
   const rgb = mutationColors?.[name];
   if (!rgb || !Array.isArray(rgb) || rgb.length !== 3) return null;
@@ -26,195 +432,8 @@ function renderColoredMutationToken(name) {
 let lastMutationClicked = null;
 let suppressLastClicked = false;
 
-function isShowUnreleased() {
-  const el = document.getElementById('toggleUnreleased');
-  return el ? !!el.checked : !!showUnreleasedDefault;
-}
-
-// --- Growth mutation visuals (Golden/Rainbow) ---
-let rainbowAnimId = null;
-let rainbowHue = 0; // [0,1)
-let rainbowAnimIdOverlay = null; // separate animation for overlay token
-
-function hsvToRgb(h, s, v) {
-  const i = Math.floor(h * 6);
-  const f = h * 6 - i;
-  const p = v * (1 - s);
-  const q = v * (1 - f * s);
-  const t = v * (1 - (1 - f) * s);
-  let r = 0, g = 0, b = 0;
-  switch (i % 6) {
-    case 0: r = v; g = t; b = p; break;
-    case 1: r = q; g = v; b = p; break;
-    case 2: r = p; g = v; b = t; break;
-    case 3: r = p; g = q; b = v; break;
-    case 4: r = t; g = p; b = v; break;
-    case 5: r = v; g = p; b = q; break;
-  }
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-function stopRainbowAnimation() {
-  if (rainbowAnimId != null) cancelAnimationFrame(rainbowAnimId);
-  rainbowAnimId = null;
-}
-
-function startRainbowAnimation(targetEl) {
-  stopRainbowAnimation();
-  let lastTs = performance.now();
-  function tick(now) {
-    const dt = Math.max(0, (now - lastTs) / 1000);
-    lastTs = now;
-    // Match Roblox: hue += dt * 0.2 → 5s full cycle
-    rainbowHue = (rainbowHue + dt * 0.2) % 1;
-    const [r, g, b] = hsvToRgb(rainbowHue, 1, 1);
-    targetEl.style.color = `rgb(${r}, ${g}, ${b})`;
-    rainbowAnimId = requestAnimationFrame(tick);
-  }
-  rainbowAnimId = requestAnimationFrame(tick);
-}
-
-function stopRainbowAnimationOverlay() {
-  if (rainbowAnimIdOverlay != null) cancelAnimationFrame(rainbowAnimIdOverlay);
-  rainbowAnimIdOverlay = null;
-}
-
-function startRainbowAnimationOverlay(targetEl) {
-  stopRainbowAnimationOverlay();
-  let lastTs = performance.now();
-  function tick(now) {
-    const dt = Math.max(0, (now - lastTs) / 1000);
-    lastTs = now;
-    rainbowHue = (rainbowHue + dt * 0.2) % 1;
-    const [r, g, b] = hsvToRgb(rainbowHue, 1, 1);
-    targetEl.style.color = `rgb(${r}, ${g}, ${b})`;
-    rainbowAnimIdOverlay = requestAnimationFrame(tick);
-  }
-  rainbowAnimIdOverlay = requestAnimationFrame(tick);
-}
-
-function applyGrowthVisuals() {
-  const growthSelect = document.getElementById("growth");
-  const value = growthSelect ? growthSelect.value : "none";
-  const buttons = document.querySelectorAll(".growth-mutations .mutation-button");
-  // Reset all button text colors and any animation
-  stopRainbowAnimation();
-  buttons.forEach(btn => { btn.style.color = ""; });
-  const activeBtn = Array.from(buttons).find(b => b.classList.contains("active"));
-  if (!activeBtn) return;
-  if (value === "golden" || value === "gold") {
-    // Static Gold
-    activeBtn.style.color = "#FFD700";
-  } else if (value === "rainbow") {
-    // Animated Rainbow
-    startRainbowAnimation(activeBtn);
-  }
-}
-
-// Compute the expected max-mutation selection set, based on current combo rules
-function computeMaxMutationSet() {
-  const result = new Set();
-  // Highest temperature by multiplier
-  let bestTemp = null;
-  let bestTempVal = -Infinity;
-  for (const t of TEMPS) {
-    if (unreleasedFlags?.[t] && !isShowUnreleased()) continue;
-    const v = Number(mutationMultipliers[t]) || 0;
-    if (v > bestTempVal) { bestTempVal = v; bestTemp = t; }
-  }
-  if (bestTemp) result.add(bestTemp);
-  // Start with all non-temp mutations
-  for (const name of mutationOrder) {
-    if (unreleasedFlags?.[name] && !isShowUnreleased()) continue;
-    if (!TEMPS.includes(name)) result.add(name);
-  }
-  // Exclusivity groups → keep first
-  for (const group of EXCLUSIVE_GROUPS) {
-    const present = group.filter(n => result.has(n));
-    if (present.length > 1) {
-      const keep = present[0];
-      group.forEach(n => { if (n !== keep) result.delete(n); });
-    }
-  }
-  // Apply combos similar to enforceMutationCombos, simplified for max snapshot
-  function hasAny(arr) { return arr.some(n => result.has(n)); }
-  function req(groups) { return groups.every(g => hasAny(g)); }
-  // Frozen
-  if (req([["Drenched", "Wet"], ["Chilled"]])) {
-    result.delete("Drenched"); result.delete("Wet"); result.delete("Chilled");
-    result.add("Frozen");
-  }
-  // Paradisal
-  if (req([["Verdant"], ["Sundried"]])) {
-    result.delete("Verdant"); result.delete("Sundried");
-    result.add("Paradisal");
-  }
-  // Clay
-  if (req([["Drenched", "Wet"], ["Sandy"]])) {
-    result.delete("Drenched"); result.delete("Wet"); result.delete("Sandy");
-    result.add("Clay");
-  }
-  // Ceramic
-  if (req([["Clay"], ["Burnt", "Fried", "Cooked", "Molten", "Sundried", "Meteoric", "Plasma"]])) {
-    result.delete("Burnt"); result.delete("Fried"); result.delete("Cooked"); result.delete("Clay");
-    result.add("Ceramic");
-  }
-  // Tempestuous
-  if (req([["Windstruck"], ["Twisted"]])) {
-    result.delete("Windstruck"); result.delete("Twisted");
-    result.add("Tempestuous");
-  }
-  // Harmonised variants
-  if (req([["Chakra"], ["CorruptChakra"]])) {
-    result.delete("Chakra"); result.delete("CorruptChakra");
-    result.add("HarmonisedChakra");
-  }
-  if (req([["FoxfireChakra"], ["CorruptFoxfireChakra"]])) {
-    result.delete("FoxfireChakra"); result.delete("CorruptFoxfireChakra");
-    result.add("HarmonisedFoxfireChakra");
-  }
-  // Spaghetti
-  if (req([["Pasta"], ["Sauce"], ["Meatball"]])) {
-    result.delete("Pasta"); result.delete("Sauce"); result.delete("Meatball");
-    result.add("Spaghetti");
-  }
-  // For Max set, include Sandy alongside Ceramic so Max visually includes it
-  if (result.has("Ceramic")) result.add("Sandy");
-  return result;
-}
-
-function updateMaxToggleVisual() {
-  const toggle = document.getElementById("maxMutation");
-  if (!toggle) return;
-  const current = new Set(getSelectedMutations());
-  const expected = computeMaxMutationSet();
-  let equal = current.size === expected.size;
-  if (equal) {
-    for (const n of expected) { if (!current.has(n)) { equal = false; break; } }
-  }
-  toggle.checked = !!equal;
-}
-
-// Convert multipliers to "stacks" = (multiplier - 1)
-const stacksEnv = Object.fromEntries(
-  Object.entries(mutationMultipliers).map(([name, multi]) => [name, (Number(multi) || 1) - 1])
-);
-
-// Split out temperature stacks
-const stacksTemp = Object.fromEntries(
-  TEMPS.map(t => [t, stacksEnv[t] || 0])
-);
-
-// Exclusive mutation groups (only one can be active)
-const EXCLUSIVE_GROUPS = [
-  ["AncientAmber", "OldAmber", "Amber"],
-  ["Cooked", "Burnt"],
-  // Temperature exclusivity now handled in main list
-  ["Wet", "Chilled", "Drenched", "Frozen"]
-];
-
-// Cap behavior flag (set true if fruitVersion ≥ 1 should cap values)
-const CAP_AT_1E12 = false;
+// Legacy constants (moved to CONFIG)
+// const CAP_AT_1E12 = CONFIG.CALCULATION.CAP_AT_1E12; // Already defined above
 
 // Runtime plant list (updated from plants.txt if available)
 let runtimePlants = plants;
@@ -223,26 +442,7 @@ function getPlants() {
   return runtimePlants;
 }
 
-// Real in-game crop value calculation (additive stacks, clamp to price-floor ratio)
-function calculateCropValue({ baseValue, baseWeight, weightKg, growth, stacksAdditive, minWeight }) {
-  const safeBaseWeight = Math.max(1e-9, Number(baseWeight) || 1);
-  const minRatio = Math.max(0, Number(minWeight) ? (Number(minWeight) / safeBaseWeight) : 0.95);
-  const ratio = Math.max((Number(weightKg) || 0) / safeBaseWeight, minRatio);
-  const growthMap = { none: 1, normal: 1, golden: 20, gold: 20, rainbow: 50 };
-  const g = growthMap[growth] ?? 1;
-  const e = 1 + (Number(stacksAdditive) || 0);
-  const perCrop = (Number(baseValue) || 0) * g * e * ratio * ratio;
-  return perCrop; // rounding happens after friend boost & quantity
-}
 
-// Helper function to derive k and minWeight for plants
-function getPlantConstants(plant) {
-  const baseValue = Number(plant.baseValue) || 0;
-  const baseWeight = Number(plant.baseWeight) || 1;
-  // Keep legacy keys out; new model only needs baseValue/baseWeight
-  const minWeight = baseWeight * 0.95;
-  return { baseValue, baseWeight, minWeight };
-}
 
 // Helper function to read calculation inputs from UI
 function readCalculationInputs() {
@@ -270,68 +470,44 @@ function readCalculationInputs() {
 }
 
 function buildMutationItems(orderArray) {
-  const container = document.getElementById("mutations");
+  const container = Utils.getElement("mutations");
   if (!container) return;
+  
   container.innerHTML = "";
-
-  // Read toggle for unreleased visibility from a checkbox if present
-  const unreleasedToggleEl = document.getElementById("toggleUnreleased");
-  const showUnreleased = unreleasedToggleEl ? unreleasedToggleEl.checked : !!showUnreleasedDefault;
+  const showUnreleased = isShowUnreleased();
 
   orderArray.forEach((name) => {
-    if (unreleasedFlags && unreleasedFlags[name] && !showUnreleased) return;
-    const id = `mut-${name}`;
+    if (unreleasedFlags?.[name] && !showUnreleased) return;
+    
     const label = document.createElement("label");
-    label.className = "mutation-item";
+    Object.assign(label, {
+      className: "mutation-item",
+      tabIndex: 0
+    });
     label.dataset.name = name;
-    label.tabIndex = 0;
+    const multiplier = mutationMultipliers[name] || 1;
+    
+    label.innerHTML = `
+      <input type="checkbox" id="mut-${name}" value="${name}">
+      <span class="mut-name">${name}</span>
+      <span class="mut-multi"> (×${multiplier})</span>
+    `;
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.id = id;
-    checkbox.value = name;
-
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "mut-name";
-    nameSpan.textContent = name;
-
-    const multiSpan = document.createElement("span");
-    multiSpan.className = "mut-multi";
-    multiSpan.textContent = ` (×${mutationMultipliers[name] || 1})`;
-
-    label.appendChild(checkbox);
-    label.appendChild(nameSpan);
-    label.appendChild(multiSpan);
-    container.appendChild(label);
-
-    // Initialize selected style from current state
-    label.classList.toggle("selected", checkbox.checked);
-    // Color the name only when selected
-    if (checkbox.checked) {
-      const rgb = getRgbStringForMutation(name);
-      if (rgb) nameSpan.style.color = rgb;
-    }
-
+    const checkbox = label.querySelector('input');
     const toggle = () => {
       if (!suppressLastClicked) lastMutationClicked = name;
-      // Never block user toggles, even if max is on
       checkbox.checked = !checkbox.checked;
       enforceMutationCombos();
       refreshMutationSelectionClasses();
           updateCalculation();
       updateMaxToggleVisual();
     };
-    label.addEventListener("click", (e) => {
-      // prevent double toggling when clicking the hidden input
-      if (e.target.tagName.toLowerCase() === 'input') return;
-      e.preventDefault();
-      toggle();
-    });
-    label.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
-    });
-    // Also react to programmatic changes
+
+    label.addEventListener("click", (e) => e.target.tagName !== 'INPUT' && (e.preventDefault(), toggle()));
+    label.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle()));
     checkbox.addEventListener("change", () => { enforceMutationCombos(); refreshMutationSelectionClasses(); updateCalculation(); updateMaxToggleVisual(); });
+    
+    container.appendChild(label);
   });
 }
 
@@ -348,97 +524,39 @@ function getSortedMutationOrder(sortMode) {
 
 let mutationSortReversed = false;
 
-// --- Combo/Restriction Engine (from MutationCombos.lua semantics) ---
+// Enforce mutation combos and restrictions
 function enforceMutationCombos() {
+  // Get current selections
   const selected = new Set();
-  const skipResults = new Set();
-  // Build current selected set (environmentals + temps)
-  const allNames = [...mutationOrder, ...TEMPS];
-  allNames.forEach((name) => {
+  [...mutationOrder, ...TEMPS].forEach((name) => {
     const cb = document.getElementById(`mut-${name}`);
     if (cb && cb.checked) selected.add(name);
   });
 
-  // Helper: enforce exclusivity within a group – if more than one selected,
-  // prefer the last-changed one by looking at the focused element, otherwise keep first hit
-  function enforceExclusive(order) {
-    const present = order.filter(n => selected.has(n));
-    if (present.length <= 1) return;
-    // Keep the last user-clicked mutation within this group if available,
-    // otherwise keep the highest-priority present (first in order)
-    const preferLast = (!suppressLastClicked && lastMutationClicked && present.includes(lastMutationClicked)) ? lastMutationClicked : null;
-    let keep = preferLast || present[0];
-    order.forEach(n => { if (n !== keep) selected.delete(n); });
-  }
-
-  // Helper: if all require groups satisfied (each group OR), set result and
-  // clear listed overwrites
-  function applyCombo(requireGroups, result, overwriteList) {
-    if (skipResults.has(result)) return;
-    // If result already present, clear overwrites (Lua behavior when already set)
-    let already = selected.has(result);
-    if (already) {
-      if (Array.isArray(overwriteList)) overwriteList.forEach((n) => selected.delete(n));
-      return;
-    }
-    let ok = true;
-    for (const group of requireGroups) {
-      let groupOk = false;
-      for (const name of group) {
-        if (selected.has(name)) { groupOk = true; break; }
-      }
-      if (!groupOk) { ok = false; break; }
-    }
-    if (ok) {
-      if (Array.isArray(overwriteList)) overwriteList.forEach((n) => selected.delete(n));
-      selected.add(result);
-    }
-  }
-
-  // Exclusivity enforcement
-  EXCLUSIVE_GROUPS.forEach(enforceExclusive);
-
-  // If the user just clicked a base for a known combo, drop the combined result (only if they select base while combo already present)
+  // Handle reverse combos (user clicked base component of existing combo)
+  const skipResults = new Set();
   if (!suppressLastClicked && lastMutationClicked) {
-    const reverseCombos = [
-      { result: "HarmonisedFoxfireChakra", bases: ["FoxfireChakra", "CorruptFoxfireChakra"] },
-      { result: "HarmonisedChakra", bases: ["Chakra", "CorruptChakra"] },
-      { result: "Spaghetti", bases: ["Pasta", "Sauce", "Meatball"] },
-      { result: "Frozen", bases: ["Wet", "Drenched", "Chilled"] },
-      { result: "Paradisal", bases: ["Verdant", "Sundried"] },
-      { result: "Clay", bases: ["Sandy", "Drenched", "Wet"] },
-      { result: "Ceramic", bases: ["Clay", "Burnt", "Fried", "Cooked", "Molten", "Sundried", "Meteoric", "Plasma"] },
-      { result: "Tempestuous", bases: ["Windstruck", "Twisted"] },
-    ];
-    for (const rule of reverseCombos) {
+    ComboProcessor.getReverseRules().forEach(rule => {
       if (selected.has(rule.result) && rule.bases.includes(lastMutationClicked)) {
         selected.delete(rule.result);
         skipResults.add(rule.result);
       }
-    }
+    });
   }
 
-  // Resulting combos
-  applyCombo([["Drenched", "Wet"], ["Chilled"]], "Frozen", ["Drenched", "Wet", "Chilled"]);
-  applyCombo([["Verdant"], ["Sundried"]], "Paradisal", ["Verdant", "Sundried"]);
-  // Form Clay when requirements are present
-  applyCombo([["Drenched", "Wet"], ["Sandy"]], "Clay", ["Drenched", "Wet", "Sandy"]);
-  applyCombo([["Clay"], ["Burnt", "Fried", "Cooked", "Molten", "Sundried", "Meteoric", "Plasma"]], "Ceramic", ["Burnt", "Fried", "Cooked", "Clay"]);
-  applyCombo([["Windstruck"], ["Twisted"]], "Tempestuous", ["Windstruck", "Twisted"]);
-  // For these combos, prefer the last clicked target if in the group
-  applyCombo([["Chakra"], ["CorruptChakra"]], lastMutationClicked === "HarmonisedChakra" ? "HarmonisedChakra" : "HarmonisedChakra", ["Chakra", "CorruptChakra"]);
-  applyCombo([["FoxfireChakra"], ["CorruptFoxfireChakra"]], lastMutationClicked === "HarmonisedFoxfireChakra" ? "HarmonisedFoxfireChakra" : "HarmonisedFoxfireChakra", ["FoxfireChakra", "CorruptFoxfireChakra"]);
-  applyCombo([["Pasta"], ["Sauce"], ["Meatball"]], lastMutationClicked === "Spaghetti" ? "Spaghetti" : "Spaghetti", ["Pasta", "Sauce", "Meatball"]);
+  // Apply combo system
+  ComboProcessor.applyCombos(selected, {
+    respectLastClicked: !suppressLastClicked,
+    lastClicked: lastMutationClicked,
+    skipResults
+  });
 
-  // Note: Do NOT auto-add Sandy when Ceramic is present; Sandy should remain user-controlled
-
-  // Write back to DOM (checkboxes)
-  allNames.forEach((name) => {
+  // Write back to DOM
+  [...mutationOrder, ...TEMPS].forEach((name) => {
     const cb = document.getElementById(`mut-${name}`);
     if (cb) cb.checked = selected.has(name);
   });
 
-  // Temperatures are regular checkboxes now; no separate buttons to sync
   refreshMutationSelectionClasses();
   updateMaxToggleVisual();
 }
@@ -500,39 +618,14 @@ function initMutations() {
   const unreleasedToggleEl = document.getElementById("toggleUnreleased");
   if (sortSelect) {
     sortSelect.addEventListener("change", () => {
-      // Preserve current selections
-      const selected = new Set(getSelectedMutations());
-      let list = getSortedMutationOrder(sortSelect.value);
-      if (mutationSortReversed) list = list.reverse();
-      buildMutationItems(list);
-      // Re-apply previous selections and listeners
-      mutationOrder.forEach((name) => {
-        const cb = document.getElementById(`mut-${name}`);
-        if (cb) {
-          cb.checked = selected.has(name);
-          cb.addEventListener("change", () => { enforceMutationCombos(); updateCalculation(); updateMaxToggleVisual(); });
-        }
-      });
-      enforceMutationCombos();
-      updateCalculation();
+      MutationManager.rebuildMutationList(sortSelect.value);
     });
   }
   if (unreleasedToggleEl) {
     unreleasedToggleEl.checked = !!showUnreleasedDefault;
     unreleasedToggleEl.addEventListener("change", () => {
-      const selected = new Set(getSelectedMutations());
-      let list = getSortedMutationOrder(document.getElementById("mutationSort")?.value || "display");
-      if (mutationSortReversed) list = list.reverse();
-      buildMutationItems(list);
-      mutationOrder.forEach((name) => {
-        const cb = document.getElementById(`mut-${name}`);
-        if (cb) {
-          cb.checked = selected.has(name);
-          cb.addEventListener("change", () => { enforceMutationCombos(); updateCalculation(); updateMaxToggleVisual(); });
-        }
-      });
-      enforceMutationCombos();
-      updateCalculation();
+      const sortMode = document.getElementById("mutationSort")?.value || "display";
+      MutationManager.rebuildMutationList(sortMode);
     });
   }
   const sortToggle = document.getElementById("mutationSortToggle");
@@ -540,19 +633,7 @@ function initMutations() {
     sortToggle.addEventListener("click", () => {
       mutationSortReversed = !mutationSortReversed;
       const sortMode = document.getElementById("mutationSort")?.value || "display";
-      const selected = new Set(getSelectedMutations());
-      let list = getSortedMutationOrder(sortMode);
-      if (mutationSortReversed) list = list.reverse();
-      buildMutationItems(list);
-      mutationOrder.forEach((name) => {
-        const cb = document.getElementById(`mut-${name}`);
-        if (cb) {
-          cb.checked = selected.has(name);
-          cb.addEventListener("change", () => { enforceMutationCombos(); updateCalculation(); updateMaxToggleVisual(); });
-        }
-      });
-      enforceMutationCombos();
-      updateCalculation();
+      MutationManager.rebuildMutationList(sortMode);
     });
   }
   
@@ -602,12 +683,8 @@ function initCrops() {
         // Store selected plant data
         selectedPlant = plant;
         
-        // Set weight to price-floor weight (95% of base weight, truncated to 2 decimals)
-        const weightInput = document.getElementById("weight");
-        if (weightInput && plant.baseWeight) {
-          const priceFloorWeight = Math.floor(plant.baseWeight * 0.95 * 100) / 100;
-          weightInput.value = priceFloorWeight.toFixed(2);
-        }
+        // Set weight to price-floor weight
+        PlantManager.setDefaultWeight(plant);
         
         // Update calculation immediately when plant is selected
         updateCalculation();
@@ -623,13 +700,145 @@ function initCrops() {
   });
 }
 
-// Moved formatNumber to global scope for reuse
-function formatNumber(num) {
+// --- Utility Functions ---
+const Utils = {
+  // Format numbers with commas and scale indicators
+  formatNumber(num) {
   if (!Number.isFinite(num)) return "0";
-  
-  // Format with commas for thousands separators
   return num.toLocaleString('en-US');
-}
+  },
+
+  formatWithScale(num) {
+    if (!Number.isFinite(num)) return "0";
+    
+    if (num >= 1e12) return `≈${(num/1e12).toFixed(3)} Trillion`;
+    if (num >= 1e9) return `≈${(num/1e9).toFixed(3)} Billion`;
+    if (num >= 1e6) return `≈${(num/1e6).toFixed(3)} Million`;
+    if (num >= 1e3) return `≈${(num/1e3).toFixed(3)} Thousand`;
+    return num.toFixed(0);
+  },
+
+  // Get element safely with null check
+  getElement(id) {
+    return document.getElementById(id);
+  },
+
+  // Set element text content safely
+  setElementText(id, text) {
+    const el = this.getElement(id);
+    if (el) el.textContent = text;
+  },
+
+  // Set element HTML safely
+  setElementHTML(id, html) {
+    const el = this.getElement(id);
+    if (el) el.innerHTML = html;
+  }
+};
+
+// --- Mutation Management ---
+const MutationManager = {
+  // Add event listeners to mutation checkboxes
+  addMutationEventListeners() {
+    mutationOrder.forEach((name) => {
+      const checkbox = Utils.getElement(`mut-${name}`);
+      if (checkbox) {
+        checkbox.addEventListener("change", () => {
+          enforceMutationCombos();
+          updateCalculation();
+          updateMaxToggleVisual();
+        });
+      }
+    });
+  },
+
+  // Get currently selected mutations
+  getSelectedMutations() {
+    const selected = [];
+    mutationOrder.forEach(name => {
+      const checkbox = Utils.getElement(`mut-${name}`);
+      if (checkbox && checkbox.checked) {
+        selected.push(name);
+      }
+    });
+    return selected;
+  },
+
+  // Apply mutations from array
+  applyMutations(mutations, clearFirst = false) {
+    if (clearFirst) {
+      this.clearAllMutations();
+    }
+    
+    mutations.forEach(name => {
+      const checkbox = Utils.getElement(`mut-${name}`);
+      if (checkbox) checkbox.checked = true;
+    });
+    
+    enforceMutationCombos();
+    refreshMutationSelectionClasses();
+  },
+
+  // Clear all mutations
+  clearAllMutations() {
+    mutationOrder.forEach((name) => {
+      const checkbox = Utils.getElement(`mut-${name}`);
+      if (checkbox) checkbox.checked = false;
+    });
+    refreshMutationSelectionClasses();
+  },
+
+  // Rebuild mutation list with preserved selections
+  rebuildMutationList(sortMode = "display", preserveSelections = true) {
+    const selected = preserveSelections ? new Set(this.getSelectedMutations()) : new Set();
+    let list = getSortedMutationOrder(sortMode);
+    if (mutationSortReversed) list = list.reverse();
+    
+    buildMutationItems(list);
+    
+    // Restore selections if preserving
+    if (preserveSelections) {
+      mutationOrder.forEach((name) => {
+        const cb = Utils.getElement(`mut-${name}`);
+        if (cb) cb.checked = selected.has(name);
+      });
+    }
+    
+    this.addMutationEventListeners();
+    enforceMutationCombos();
+    updateCalculation();
+  },
+
+  // Apply max mutations (highest value mutations)
+  applyMaxMutations() {
+    suppressLastClicked = true;
+    this.clearAllMutations();
+    
+    // Set growth to rainbow (highest value)
+    Utils.getElement("growth").value = "rainbow";
+    
+    // Update growth mutation buttons
+    document.querySelectorAll(".growth-mutations .mutation-button").forEach(btn => {
+      btn.classList.remove("active");
+      if (btn.dataset.value === "rainbow") {
+        btn.classList.add("active");
+      }
+    });
+    
+    // Get the optimal mutation set from the same function used by the visual toggle
+    const optimalMutations = computeMaxMutationSet();
+    
+    // Apply all mutations in the optimal set
+    optimalMutations.forEach(name => {
+      const checkbox = Utils.getElement(`mut-${name}`);
+      if (checkbox) checkbox.checked = true;
+    });
+    
+    refreshMutationSelectionClasses();
+    suppressLastClicked = false;
+    updateMaxToggleVisual();
+  }
+};
 
 // Initialize new UI controls
 function initNewControls() {
@@ -689,352 +898,105 @@ function initNewControls() {
   }
 }
 
-// Pure calculation function that can work with saved data
-/**
- * Calculate the total value for a plant batch.
- *
- * Assumptions:
- * - Core value scales with the square of the weight ratio:
- *     CropValue = BaseValue * (Weight / BaseWeight) ** 2
- * - Growth mutations are multiplicative (none=1, golden=20, rainbow=50).
- * - Environmental mutations stack multiplicatively by default (product of each).
- * - Friend boost is a percentage (e.g., 15 => +15%).
- *
- * @param {Object} plantData
- * @param {number} plantData.baseValue     // value at base/average weight
- * @param {number} plantData.baseWeight    // average/base weight (kg)
- *
- * @param {Object} settings
- * @param {number} [settings.weight]             // actual item weight; defaults to baseWeight
- * @param {number} [settings.quantity=1]
- * @param {number} [settings.friendBoost=0]      // percent (e.g., 15 = +15%)
- * @param {"none"|"golden"|"rainbow"} [settings.growthMutation="none"]
- * @param {string[]} [settings.mutations=[]]     // list of mutation names
- * @param {Record<string, number>} [settings.mutationMultipliers] // map name -> factor (e.g., Rose Petals: 1.1)
- *
- * @param {Object} [options]
- * @param {"product"|"sumMinusCount"} [options.envStacking="product"]
- *
- * @returns {number} rounded total value (integer)
- */
-function calculateCoreValue(plantData, settings = {}, options = {}) {
-  if (!plantData) return 0;
+// Note: calculateCoreValue was removed as dead code - the actual calculation uses calculateCropValue
 
-  const {
-    baseValue: rawBaseValue = 0,
-    baseWeight: rawBaseWeight = 1
-  } = plantData;
 
-  // sanitize numeric inputs
-  const baseValue  = Math.max(0, Number(rawBaseValue) || 0);
-  const baseWeight = Math.max(1e-9, Number(rawBaseWeight) || 1); // avoid 0-div
-
-  const {
-    weight: rawWeight,
-    quantity: rawQty = 1,
-    friendBoost: rawFriend = 0,
-    growthMutation = "none",
-    mutations = [],
-    mutationMultipliers: localMutationMap
-  } = settings;
-
-  const qty        = Math.max(0, Math.floor(Number(rawQty) || 1));
-  const friendPct  = Number(rawFriend) || 0;
-
-  // If no weight is provided, use baseWeight (so value = baseValue)
-  const weight = Math.max(0, Number(rawWeight ?? baseWeight));
-
-  // Growth mutation factor
-  const growthMap = { none: 1, golden: 20, rainbow: 50 };
-  const growthMulti = growthMap[growthMutation] ?? 1;
-
-  // Resolve mutation multiplier map (allow passing via settings OR global)
-  const mutationMap =
-    localMutationMap ||
-    (typeof mutationMultipliers !== "undefined" ? mutationMultipliers : {});
-
-  // Environmental (non-growth) mutation stacking
-  const { envStacking = "product" } = options;
-
-  let environmentalMultiplier = 1;
-  if (mutations.length > 0) {
-    if (envStacking === "sumMinusCount") {
-      // If your mutationMap stores factors like 1.20, 0.95, etc.,
-      // sumMinusCount implements: 1 + (Σ factors) - (#mutations)
-      // i.e., adds their deltas from 1.0 linearly.
-      const sum = mutations.reduce(
-        (acc, name) => acc + (Number(mutationMap[name]) || 1),
-        0
-      );
-      environmentalMultiplier = Math.max(0, 1 + sum - mutations.length);
-    } else {
-      // Default/accurate: multiply all mutation factors
-      environmentalMultiplier = mutations.reduce(
-        (prod, name) => prod * (Number(mutationMap[name]) || 1),
-        1
-      );
-    }
-  }
-
-  const mutationMultiplier = growthMulti * environmentalMultiplier;
-
-  // Core crop value (quadratic weight scaling)
-  const weightRatio = weight > 0 ? weight / baseWeight : 0;
-  const cropValue = baseValue * Math.pow(weightRatio, 2);
-
-  // Friend boost (percent)
-  const friendMulti = 1 + (friendPct / 100);
-
-  // Total (rounded to nearest integer)
-  const total = cropValue * mutationMultiplier * friendMulti * qty;
-  return Math.round(total);
+// Helper to update display when no plant selected
+function updateEmptyDisplay() {
+  ["totalPrice", "totalPriceThousand", "mutationMultiplier", "displayWeight", "activeMutationsList", "hoverOverlayText"].forEach(id => Utils.setElementText(id, id === "mutationMultiplier" ? "x1" : "0"));
+  Utils.setElementText("selectedPlantName", "Select a plant");
+  Utils.setElementText("plantWorth", "0 Sheckles");
 }
+
+// Helper to get active mutations list
 
 
 function updateCalculation() {
-  // Get elements with null checks
-  const totalPriceEl = document.getElementById("totalPrice");
-  const totalPriceThousandEl = document.getElementById("totalPriceThousand");
-  const mutationMultiplierEl = document.getElementById("mutationMultiplier");
-  const selectedPlantNameEl = document.getElementById("selectedPlantName");
-  const displayWeightEl = document.getElementById("displayWeight");
-  const plantWorthEl = document.getElementById("plantWorth");
-  const plantIconEl = document.querySelector(".plant-icon");
-  const activeMutationsListEl = document.getElementById("activeMutationsList");
-  const hoverOverlayEl = document.getElementById("hoverOverlayText");
+  if (!selectedPlant) return updateEmptyDisplay();
   
-  if (!selectedPlant) {
-    // Set default display when no plant selected
-    if (totalPriceEl) totalPriceEl.textContent = "0";
-    if (totalPriceThousandEl) totalPriceThousandEl.textContent = "0";
-    if (mutationMultiplierEl) mutationMultiplierEl.textContent = "x1";
-    if (selectedPlantNameEl) selectedPlantNameEl.textContent = "Select a plant";
-    if (displayWeightEl) displayWeightEl.textContent = "0";
-    if (plantWorthEl) plantWorthEl.textContent = "0 Sheckles";
-    if (activeMutationsListEl) activeMutationsListEl.textContent = "None";
-    if (hoverOverlayEl) hoverOverlayEl.textContent = "";
-    return;
-  }
-  
-  // Get plant constants (base and minWeight)
-  const plant = selectedPlant;
-  const { baseValue, baseWeight, minWeight } = getPlantConstants(plant);
-  
-  // Get inputs from UI
+  const { baseValue, baseWeight, minWeight } = PlantManager.getPlantConstants(selectedPlant);
   const { weight, quantity, friendBoost, growth, temperature, envMutations } = readCalculationInputs();
 
-  // Make sure weight is a number
-  const weightNum = Number(weight);
-  
-  // Build additive stacks from selected mutations
-  const tempStack = temperature ? (Number(stacksTemp[temperature]) || 0) : 0;
-  const otherStacks = envMutations.reduce((sum, name) => sum + (Number(stacksEnv[name]) || 0), 0);
+  // Calculate stacks and value
+  const tempStack = temperature ? (stacksTemp[temperature] || 0) : 0;
+  const otherStacks = envMutations.reduce((sum, name) => sum + (stacksEnv[name] || 0), 0);
   const stacksAdditive = tempStack + otherStacks;
 
-  // Per‑crop value from in‑game logic
-  let perCrop = calculateCropValue({
-    baseValue,
-    baseWeight,
-    weightKg: weightNum,
-    growth,
-    stacksAdditive,
-    minWeight
-  });
+  // Count total number of mutations (temperature + environmental)
+  const numberOfMutations = (temperature ? 1 : 0) + envMutations.length;
 
-  // Apply friend boost and quantity, then cap if needed
-  const friendMulti = 1 + (Number(friendBoost) / 100);
-  let totalValue = perCrop * friendMulti * Math.max(1, Number(quantity) || 1);
-  totalValue = Math.round(totalValue);
+  let perCrop = calculateCropValue({ baseValue, baseWeight, weightKg: Number(weight), growth, stacksAdditive, minWeight, numberOfMutations });
+  const friendMulti = 1 + (friendBoost / 100);
+  let totalValue = Math.round(perCrop * friendMulti * Math.max(1, quantity || 1));
   if (CAP_AT_1E12) totalValue = Math.min(totalValue, 1e12);
   
-  // Update total price display
-  if (totalPriceEl) totalPriceEl.textContent = formatNumber(totalValue);
+  // Update displays
+  Utils.setElementText("totalPrice", Utils.formatNumber(totalValue));
+  Utils.setElementText("totalPriceThousand", Utils.formatWithScale(totalValue));
+  Utils.setElementText("selectedPlantName", selectedPlant.name);
+  Utils.setElementText("displayWeight", weight || "0");
+  Utils.setElementText("plantWorth", `${Utils.formatWithScale(totalValue)} Sheckles`);
   
-  // Update formatted price display
-  if (totalPriceThousandEl) {
-    const n = totalValue;
-    totalPriceThousandEl.textContent =
-      n >= 1e12 ? `≈${(n/1e12).toFixed(3)} Trillion` :
-      n >= 1e9  ? `≈${(n/1e9 ).toFixed(3)} Billion`  :
-      n >= 1e6  ? `≈${(n/1e6 ).toFixed(3)} Million`  :
-      n >= 1e3  ? `≈${(n/1e3 ).toFixed(3)} Thousand` :
-      n.toString();
-  }
+  const totalMultiplier = (CONFIG.GROWTH_MULTIPLIERS[growth] ?? 1) * (1 + stacksAdditive - numberOfMutations) * friendMulti;
+  Utils.setElementText("mutationMultiplier", `x${Utils.formatWithScale(totalMultiplier)}`);
   
-  // Show "total multiplier" including friend boost (matches site display)
-  const growthMap = { none: 1, golden: 20, rainbow: 50 };
-  const growthMulti = growthMap[growth] ?? 1;
-  const envMultiplier = 1 + stacksAdditive;
-  const friendMultiDisplay = 1 + (friendBoost / 100);
-  const totalMultiplier = growthMulti * envMultiplier * friendMultiDisplay;
-  if (mutationMultiplierEl) mutationMultiplierEl.textContent = `x${formatThousands(totalMultiplier)}`;
+  // Update mutations display (both preview and overlay use display order)
+  const previewMutations = getActiveMutationsListForPreview(growth, temperature, envMutations);
   
-  // Update plant name and weight
-  if (selectedPlantNameEl) selectedPlantNameEl.textContent = selectedPlant.name;
-  if (displayWeightEl) displayWeightEl.textContent = weight || "0";
-  
-  // Show fully multiplied value (to match top Total Value)
-  if (plantWorthEl) {
-    plantWorthEl.textContent = `${formatThousands(totalValue)} Sheckles`;
-  }
-  
-  // Update plant icon with emoji
-  if (plantIconEl) {
-    plantIconEl.textContent = "🌱";
-  }
-  
-  // Build list of active mutations once
-  // Order temperature + environmental mutations to match current list order
-  const sortMode = document.getElementById("mutationSort")?.value || "display";
-  let orderList = getSortedMutationOrder(sortMode);
-  if (mutationSortReversed) orderList = orderList.slice().reverse();
-  const selectedSet = new Set([...(temperature ? [temperature] : []), ...envMutations]);
-  const orderedSelected = orderList.filter((n) => selectedSet.has(n));
+  Utils.setElementText("activeMutationsList", previewMutations.length ? previewMutations.join(" + ") : "None");
 
-  const allMutations = [];
-  if (growth !== "none") {
-    allMutations.push(growth === "golden" ? "Golden" : "Rainbow");
-  }
-  allMutations.push(...orderedSelected);
-
-  // Update active mutations list
-  if (activeMutationsListEl) {
-    activeMutationsListEl.textContent = allMutations.length > 0 
-      ? allMutations.join(" + ") 
-      : "None";
-  }
-
-  // Update hover-style overlay text under mutations list
+  // Update overlay (also uses display order)
+  const hoverOverlayEl = Utils.getElement("hoverOverlayText");
   if (hoverOverlayEl) {
-    const mutationLineHtml = allMutations.length > 0 
-      ? allMutations.map(renderColoredMutationToken).join(" <span class=\"overlay-sep\">•</span> ")
-      : "None";
-    hoverOverlayEl.innerHTML = `
-      <div class="overlay-plant-name">${selectedPlant.name}</div>
-      <div class="overlay-mutations">${mutationLineHtml}</div>
-      <div class="overlay-value">${formatThousands(totalValue)}¢</div>
-    `;
-
-    // Apply growth visuals on overlay token when present
+    const mutationHtml = previewMutations.length ? previewMutations.map(renderColoredMutationToken).join(" <span class=\"overlay-sep\">•</span> ") : "None";
+    hoverOverlayEl.innerHTML = `<div class="overlay-plant-name">${selectedPlant.name}</div><div class="overlay-mutations">${mutationHtml}</div><div class="overlay-value">${Utils.formatWithScale(totalValue)}¢</div>`;
+    
+    // Apply growth visuals
     const growthToken = hoverOverlayEl.querySelector('.overlay-mutation[data-name="Golden"], .overlay-mutation[data-name="Rainbow"]');
-    if (growth === 'golden' || growth === 'gold') {
-      stopRainbowAnimationOverlay();
-      if (growthToken) growthToken.style.color = '#FFD700';
-    } else if (growth === 'rainbow') {
-      if (growthToken) startRainbowAnimationOverlay(growthToken);
-    } else {
-      stopRainbowAnimationOverlay();
+    stopRainbowAnimation('overlay-token');
+    if (growthToken) {
+      if (growth === 'golden' || growth === 'gold') growthToken.style.color = CONFIG.ANIMATION.GOLDEN_COLOR;
+      else if (growth === 'rainbow') createRainbowAnimation(growthToken, 'overlay-token');
     }
   }
   
-  // Save current state to localStorage
+  // Update plant icon
+  const plantIconEl = document.querySelector(".plant-icon");
+  if (plantIconEl) plantIconEl.textContent = "🌱";
+  
   saveUserData();
   updateMaxToggleVisual();
 }
 
-// Helper functions for max mutations and reset
-function applyMaxMutations() {
-  // Apply the highest value mutations
-  const sortedMutations = mutationOrder.slice().sort((a, b) => 
-    (mutationMultipliers[b] || 0) - (mutationMultipliers[a] || 0)
-  );
-  suppressLastClicked = true;
-  
-  // Clear all first
-  clearAllMutations();
-  
-  // Set growth to rainbow (highest value)
-  document.getElementById("growth").value = "rainbow";
-  
-  // Update growth mutation buttons
-  document.querySelectorAll(".growth-mutations .mutation-button").forEach(btn => {
-    btn.classList.remove("active");
-    if (btn.dataset.value === "rainbow") {
-      btn.classList.add("active");
-    }
-  });
-  
-  // Find highest value temperature mutation
-  let highestTempMutation = null;
-  let highestTempValue = 0;
-  
-  const temperatureMutations = ["Wet", "Chilled", "Drenched", "Frozen"];
-  temperatureMutations.forEach(name => {
-    const value = mutationMultipliers[name] || 0;
-    if (value > highestTempValue) {
-      highestTempValue = value;
-      highestTempMutation = name;
-    }
-  });
-  
-  // Apply highest temperature mutation
-  if (highestTempMutation) {
-    const tempCheckbox = document.getElementById(`mut-${highestTempMutation}`);
-    if (tempCheckbox) tempCheckbox.checked = true;
-    
-    const tempButton = document.getElementById(`temp-mut-${highestTempMutation}`);
-    if (tempButton) tempButton.classList.add("active");
-  }
-  
-  // Apply ALL other mutations (excluding temperature mutations)
-  const tempMutationSet = new Set(temperatureMutations);
-  let filteredMutations = sortedMutations.filter(name => !tempMutationSet.has(name));
-  // Respect unreleased visibility
-  filteredMutations = filteredMutations.filter(name => !(unreleasedFlags?.[name] && !isShowUnreleased()));
-  
-  // Bulk-select all non-temp mutations, including Sandy
-  filteredMutations.forEach(name => {
-    const checkbox = document.getElementById(`mut-${name}`);
-    if (checkbox) checkbox.checked = true;
-  });
-
-  // Enforce exclusivity/combos after selecting all and refresh UI state
-  enforceMutationCombos();
-  // Ensure Sandy is included under Max when Ceramic present (nested availability)
-  const ceramicCb = document.getElementById('mut-Ceramic');
-  const sandyCb = document.getElementById('mut-Sandy');
-  if (ceramicCb && ceramicCb.checked && sandyCb) {
-    sandyCb.checked = true;
-  }
-  refreshMutationSelectionClasses();
-  suppressLastClicked = false;
-  updateMaxToggleVisual();
-}
+// Legacy alias for compatibility
+const applyMaxMutations = () => MutationManager.applyMaxMutations();
 
 function clearAllMutations() {
   // Clear all mutation checkboxes
-  mutationOrder.forEach((name) => {
-    const checkbox = document.getElementById(`mut-${name}`);
-    if (checkbox) checkbox.checked = false;
-  });
+  MutationManager.clearAllMutations();
   
   // Reset growth select
-  document.getElementById("growth").value = "none";
+  Utils.getElement("growth").value = "none";
   
   // Reset growth mutation buttons
   document.querySelectorAll(".growth-mutations .mutation-button").forEach(btn => {
     btn.classList.remove("active");
   });
-  document.getElementById("growth-none").classList.add("active");
+  Utils.getElement("growth-none").classList.add("active");
   
   // Reset temperature mutation buttons
   document.querySelectorAll("#temperature-mutations .mutation-button").forEach(btn => {
     btn.classList.remove("active");
   });
 
-  // After clearing, refresh mutation UI selection state
-  refreshMutationSelectionClasses();
   // Also clear any growth coloring/animation
   applyGrowthVisuals();
 }
 
 function resetAllControls() {
-  // Reset weight to the selected plant's minimum (95% of base weight)
-  const weightEl = document.getElementById("weight");
-  if (selectedPlant && weightEl) {
-    const { baseWeight } = getPlantConstants(selectedPlant);
-    const priceFloorWeight = Math.floor(baseWeight * 0.95 * 100) / 100;
-    weightEl.value = priceFloorWeight.toFixed(2);
+  // Reset weight to the selected plant's minimum
+  if (selectedPlant) {
+    PlantManager.setDefaultWeight(selectedPlant);
   }
   document.getElementById("quantity").value = "1";
   document.getElementById("friendBoost").value = "0";
@@ -1056,21 +1018,9 @@ function resetAllControls() {
   localStorage.removeItem("gardenCalcData");
 }
 
-function formatThousands(num) {
-  if (!Number.isFinite(num)) return "0";
-  
-  if (num >= 1000000000000) {
-    return "≈" + (num / 1000000000000).toFixed(3) + " Trillion";
-  } else if (num >= 1000000000) {
-    return "≈" + (num / 1000000000).toFixed(3) + " Billion";
-  } else if (num >= 1000000) {
-    return "≈" + (num / 1000000).toFixed(3) + " Million";
-  } else if (num >= 1000) {
-    return "≈" + (num / 1000).toFixed(3) + " Thousand";
-  } else {
-    return num.toFixed(0);
-  }
-}
+// Legacy alias for compatibility
+const formatNumber = Utils.formatNumber;
+const formatThousands = Utils.formatWithScale;
 
 // Save current session data to localStorage
 function saveUserData() {
@@ -1224,17 +1174,8 @@ function loadUserData() {
   }
 }
 
-// Helper to get selected mutations
-function getSelectedMutations() {
-  const selected = [];
-  mutationOrder.forEach(name => {
-    const checkbox = document.getElementById(`mut-${name}`);
-    if (checkbox && checkbox.checked) {
-      selected.push(name);
-    }
-  });
-  return selected;
-}
+// Legacy alias for compatibility
+const getSelectedMutations = () => MutationManager.getSelectedMutations();
 
 // Render saved plants in the sidebar
 function renderSavedPlants() {
@@ -1281,7 +1222,7 @@ function renderSavedPlants() {
     // Set value - recalc using in-game logic
     const plantData = getPlants().find(p => p.id === save.plant.id);
     if (plantData) {
-      const { baseValue, baseWeight } = getPlantConstants(plantData);
+      const { baseValue, baseWeight } = PlantManager.getPlantConstants(plantData);
       const growth = save.settings.growthMutation || "none";
       const userMutations = Array.isArray(save.settings.mutations) ? save.settings.mutations : [];
       const temperature = TEMPS.find(t => userMutations.includes(t)) || null;
@@ -1289,6 +1230,7 @@ function renderSavedPlants() {
       const tempStack = temperature ? (Number(stacksTemp[temperature]) || 0) : 0;
       const otherStacks = envMutations.reduce((sum, name) => sum + (Number(stacksEnv[name]) || 0), 0);
       const stacksAdditive = tempStack + otherStacks;
+      const numberOfMutations = (temperature ? 1 : 0) + envMutations.length;
 
       let perCrop = calculateCropValue({
         baseValue,
@@ -1296,7 +1238,8 @@ function renderSavedPlants() {
         weightKg: Number(save.settings.weight) || 0,
         growth,
         stacksAdditive,
-        minWeight: baseWeight * 0.95
+        minWeight: baseWeight * CONFIG.CALCULATION.PRICE_FLOOR_RATIO,
+        numberOfMutations
       });
       let value = perCrop * (1 + (Number(save.settings.friendBoost) || 0) / 100) * Math.max(1, Number(save.settings.quantity) || 1);
       value = Math.round(value);
@@ -1339,44 +1282,9 @@ function renderSavedPlants() {
   });
 }
 
-// Calculate weight from target value
-function calculateWeightFromValue(targetValue, plantData, settings = {}) {
-  if (!plantData) return 0;
-  if (targetValue <= 0) return 0;
-
-  // Get plant constants
-  const { baseValue, baseWeight, minWeight } = getPlantConstants(plantData);
-
-  // Process settings to match site calculator format
-  const { quantity, friendBoost, growthMutation, mutations } = settings;
-  
-  // Split mutations into temperature and environmental
-  const temperature = TEMPS.find(t => mutations.includes(t)) || null;
-  const envMutations = mutations.filter(name => !TEMPS.includes(name));
-
-  // Convert growth mutation to the format expected by calculateSiteAccurate
-  const growth = growthMutation || 'none';
-
-  // Rebuild additive stacks and growth
-  const growthMap = { none: 1, golden: 20, rainbow: 50 };
-  const growthMulti = growthMap[growth] || 1;
-  const tempStack = temperature ? (Number(stacksTemp[temperature]) || 0) : 0;
-  const otherStacks = envMutations.reduce((sum, name) => sum + (Number(stacksEnv[name]) || 0), 0);
-  const e = 1 + tempStack + otherStacks;
-  const friendMulti = 1 + (Number(friendBoost) / 100);
-  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
-  
-  const perCropTarget = Math.max(1, targetValue / (friendMulti * qty));
-  const baseFactor = baseValue * growthMulti * e;
-  if (baseFactor <= 0) return 0;
-
-  // perCrop = baseValue * g * e * (ratio^2)
-  // ratio^2 = perCrop / (baseValue * g * e)
-  const ratioSquared = perCropTarget / baseFactor;
-  const ratio = Math.max(Math.sqrt(Math.max(0, ratioSquared)), 0.95);
-  const weight = ratio * baseWeight;
-  return Math.max(weight, minWeight);
-}
+// Legacy alias for compatibility
+const calculateWeightFromValue = (targetValue, plantData, settings) => 
+  PlantManager.calculateWeightFromValue(targetValue, plantData, settings);
 
 // Load a saved setup
 function loadSavedSetup(id) {
@@ -1571,11 +1479,7 @@ function initReverseCalculator() {
   });
 }
 
-// Helper to get selected growth mutation
-function getSelectedGrowthMutation() {
-  const growthSelect = document.getElementById("growth");
-  return growthSelect ? growthSelect.value : "none";
-}
+
 
 function initializeApp() {
   // Initialize core components first
@@ -1600,15 +1504,10 @@ function initializeApp() {
   
   // Add event listeners to mutation checkboxes after they're created
   setTimeout(() => {
-    mutationOrder.forEach((name) => {
-      const checkbox = document.getElementById(`mut-${name}`);
-      if (checkbox) {
-    checkbox.addEventListener("change", () => { enforceMutationCombos(); updateCalculation(); updateMaxToggleVisual(); });
-      }
-    });
+    MutationManager.addMutationEventListeners();
     
     // Add event listener to growth select
-    const growthSelect = document.getElementById("growth");
+    const growthSelect = Utils.getElement("growth");
     if (growthSelect) {
         growthSelect.addEventListener("change", () => { updateCalculation(); updateMaxToggleVisual(); applyGrowthVisuals(); });
       }
