@@ -352,6 +352,35 @@
   font-size: 0.9rem;
 }
 
+
+
+.pets-toy-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pets-toy-btn {
+  flex: 1;
+  background: #3a3a50;
+  border: 1px solid #4a5568;
+  color: #e0e0e0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.pets-toy-btn:hover {
+  border-color: #7dd87f;
+}
+
+.pets-toy-btn.active {
+  background: #7dd87f;
+  color: #1a1a2e;
+  border-color: #7dd87f;
+}
+
 .pets-mutation-buttons {
   display: flex;
   gap: 0.5rem;

@@ -1,4 +1,4 @@
-import { mutationOrder, mutationMultipliers, mutationColors, unreleasedFlags, showUnreleasedDefault } from './data/mutations.js';
+import { mutationOrder, mutationMultipliers, mutationColors, unreleasedFlags, showUnreleasedDefault, mutationCombos, mutationPriorityGroups } from './data/mutations.js';
 import { plants } from './data/plants.js';
 
 // ================================================================
@@ -41,30 +41,18 @@ const stacksTemp = Object.fromEntries(
 );
 
 // --- Mutation Combo System ---
-// Define how mutations combine and interact
+// Define how mutations combine and interact using imported data from mutations.js
 const COMBO_RULES = {
-  // Exclusive groups (only one can be active at a time)
-  exclusiveGroups: [
-    ["AncientAmber", "OldAmber", "Amber"],
-    ["Cooked", "Burnt"]
-    // Note: Temperature mutations are handled by combo system, not exclusivity
-  ],
+  // Exclusive groups (derived from mutationPriorityGroups)
+  exclusiveGroups: Object.values(mutationPriorityGroups),
   
-  // Combination recipes: [requirements] -> result (removes components)
-  combinations: [
-    { requires: [["Drenched", "Wet"], ["Chilled"]], result: "Frozen", removes: ["Drenched", "Wet", "Chilled"] },
-    { requires: [["Verdant"], ["Sundried"]], result: "Paradisal", removes: ["Verdant", "Sundried"] },
-    { requires: [["Drenched", "Wet"], ["Sandy"]], result: "Clay", removes: ["Drenched", "Wet", "Sandy"] },
-    { requires: [["Clay"], ["Burnt", "Fried", "Cooked", "Molten", "Sundried", "Meteoric", "Plasma"]], result: "Ceramic", removes: ["Burnt", "Fried", "Cooked", "Clay"] },
-    { requires: [["Windstruck"], ["Twisted"]], result: "Tempestuous", removes: ["Windstruck", "Twisted"] },
-    { requires: [["Chakra"], ["CorruptChakra"]], result: "HarmonisedChakra", removes: ["Chakra", "CorruptChakra"] },
-    { requires: [["FoxfireChakra"], ["CorruptFoxfireChakra"]], result: "HarmonisedFoxfireChakra", removes: ["FoxfireChakra", "CorruptFoxfireChakra"] },
-    { requires: [["Pasta"], ["Sauce"], ["Meatball"]], result: "Spaghetti", removes: ["Pasta", "Sauce", "Meatball"] }
-  ]
+  // Combination recipes: imported from mutationCombos
+  combinations: mutationCombos.map(combo => ({
+    requires: combo.requires,
+    result: combo.name,
+    removes: combo.removes
+  }))
 };
-
-// Legacy alias for compatibility
-const EXCLUSIVE_GROUPS = COMBO_RULES.exclusiveGroups;
 
 // --- Max Mutation Set Calculator ---
 // Computes the optimal mutation selection for maximum value
@@ -207,7 +195,7 @@ const ComboProcessor = {
   applyCombos(mutations, options = {}) {
     const { respectLastClicked = false, lastClicked = null, skipResults = new Set() } = options;
     
-    // Apply exclusivity rules
+    // Apply exclusivity rules from priority groups
     COMBO_RULES.exclusiveGroups.forEach(group => {
       const present = group.filter(n => mutations.has(n));
       if (present.length > 1) {

@@ -2,16 +2,8 @@ import { Pets, Passives } from './pets_passives_db.js';
 
 // Rarity mapping and order
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythical', "divine", "prismatic"];
-const RARITY_NAMES = {
-  common: 'Common',
-  uncommon: 'Uncommon', 
-  rare: 'Rare',
-  epic: 'Epic',
-  legendary: 'Legendary',
-  mythical: 'Mythical',
-  divine: 'Divine',
-  prismatic: 'Prismatic'
-};
+
+// Constants
 
 // Helper function to normalize rarity
 function normalizeRarity(rarity) {
@@ -19,15 +11,31 @@ function normalizeRarity(rarity) {
   return rarity.toLowerCase();
 }
 
-// Utility functions
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+// Toys → PASSIVE_BOOST entries for computePassive()
+function getToyExtraBoosts() {
+  const boosts = [];
+  const smallOn  = document.getElementById('toySmall')?.classList.contains('active');
+  const mediumOn = document.getElementById('toyMedium')?.classList.contains('active');
+  if (smallOn)  boosts.push({ BoostType: 'PASSIVE_BOOST', BoostAmount: 0.10 });
+  if (mediumOn) boosts.push({ BoostType: 'PASSIVE_BOOST', BoostAmount: 0.20 });
+  return boosts;
 }
 
-function formatSecondsMMSS(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+
+
+// Utility functions
+
+// Keep math in double precision; only round when formatting for UI.
+function getInternalWeightKg(levelInput, weightUiInput) {
+  const L = Math.max(1, Math.min(100, Number(levelInput) || 1));
+  const wUi = Number(weightUiInput);
+  if (!Number.isFinite(wUi) || wUi <= 0) return 0;
+
+  // Reconstruct baseWeight from what the user typed/shows,
+  // then rebuild W with full precision.
+  const growth = 1 + 0.1 * L;
+  const baseWeight = wUi / growth;
+  return baseWeight * growth;
 }
 
 function formatNumber(num) {
@@ -89,34 +97,23 @@ function getLocalThumbnailPath(assetId, petName) {
 function computePassive(passive, level, opts = {}) {
   const {
     mutation = "none",
-    petPassiveBonus = 0,
-    sprinklerPetBoost = 0,
+    petPassiveBonus = 0,       // reserved, not used currently
+    sprinklerPetBoost = 0,     // reserved, not used currently
     extraBoosts = [],
     renderDescription = true,
   } = opts;
 
-  // 1) Effective level (L′)
-  // If user provided current weight (kg), use L′ = weightKg
-  // Otherwise use L′ = level + PetPassiveBonus + SprinklerPetBoost (treat missing as 0)
-  const L = Math.max(1, Math.min(100, Number(level) || 1));
-  let effectiveLevel;
-  
+  // Drivers: weight (if provided) else level (1..100)
+  const L_age = Math.max(1, Math.min(100, Number(level) || 1));
   const currentWeightKg = opts.currentWeightKg;
-  if (currentWeightKg !== undefined && currentWeightKg !== null && Number.isFinite(Number(currentWeightKg))) {
-    effectiveLevel = Number(currentWeightKg);
-    // Debug: Log when using weight-based effective level
-    console.log(`Using weight-based effective level: L′ = ${effectiveLevel} kg (from input weight)`);
-    // For Sea Turtle at L100, correct weight should be baseWeight × 11
-    // If user entered different weight, that's what we'll use for L′
-  } else {
-    effectiveLevel = L + (Number(petPassiveBonus) || 0) + (Number(sprinklerPetBoost) || 0);
-    console.log(`Using level-based effective level: L′ = ${effectiveLevel} (from level + bonuses)`);
-  }
+  const L_weight = (currentWeightKg !== undefined && currentWeightKg !== null && Number.isFinite(Number(currentWeightKg)))
+    ? Number(currentWeightKg)
+    : L_age; // fallback to Age if kg not provided
 
-  // 2) PASSIVE_BOOST factor (None=1.0, Gold=1.1, Rainbow=1.2, plus any extra)
+  // PASSIVE_BOOST sources summed once
   const mutationBoost =
-    mutation === "gold" ? 0.1 :
-    mutation === "rainbow" ? 0.2 : 0.0;
+    mutation === "gold" ? 0.10 :
+    mutation === "rainbow" ? 0.20 : 0.0;
 
   const extraSum = (Array.isArray(extraBoosts) ? extraBoosts : [])
     .filter(b => b && b.BoostType === "PASSIVE_BOOST")
@@ -124,7 +121,7 @@ function computePassive(passive, level, opts = {}) {
 
   const boostFactor = 1 + mutationBoost + extraSum;
 
-  // 3) Compute each state
+  // Compute each state with the same driver (matches game: driver = weightKg)
   const out = {};
   const states = passive && passive.States ? passive.States : {};
   for (const fieldName of Object.keys(states)) {
@@ -135,29 +132,26 @@ function computePassive(passive, level, opts = {}) {
     const Max = spec.Max !== undefined ? Number(spec.Max) : undefined;
     const Formatter = spec.Formatter || undefined;
 
-    // Field value calculation:
-    // pre = Base + Scale × L′
-    // If field === "Cooldown": value = pre − Base × (boostFactor − 1)  
-    // Else: value = pre + Base × (boostFactor − 1)
-    // Clamp last using Min/Max (Shell Share cooldown Min=20s, Water Splash cooldown Min=10s)
-    
-    const pre = Base + Scale * effectiveLevel;  // pre = Base + Scale × L′
+    // pre = Base + Scale × driver
+    const pre = Base + Scale * L_weight;
 
     let val;
-    if (fieldName === "Cooldown") {
-      val = pre - Base * (boostFactor - 1);
-      // Debug Shell Share calculation
-      if (fieldName === "Cooldown" && Base === 720 && Scale === -6.5) {
-        console.log(`Shell Share Debug: Base=${Base}, Scale=${Scale}, L′=${effectiveLevel}`);
-        console.log(`pre = ${Base} + ${Scale} × ${effectiveLevel} = ${pre}`);
-        console.log(`mutation: ${mutation}, boostFactor = ${boostFactor}, Base × (boostFactor - 1) = ${Base * (boostFactor - 1)}`);
-        console.log(`value = ${pre} - ${Base * (boostFactor - 1)} = ${val}`);
+          // All stats including Boost use the same formula now
+      if (fieldName === "Cooldown") {
+        val = pre - Base * (boostFactor - 1);
+        // (Optional debug for Shell Share cooldown)
+        if (Base === 720 && Scale === -6.5) {
+          console.log(`Shell Share Debug: Base=${Base}, Scale=${Scale}, driver=${L_weight}`);
+          console.log(`pre = ${Base} + (${Scale}) × ${L_weight} = ${pre}`);
+          console.log(`boostFactor = ${boostFactor} → Base×(bf−1)=${Base * (boostFactor - 1)}`);
+          console.log(`value = ${pre} - ${Base * (boostFactor - 1)} = ${val}`);
+        }
+      } else {
+        // Non-cooldowns add the Base slice
+        val = pre + Base * (boostFactor - 1);
       }
-    } else {
-      val = pre + Base * (boostFactor - 1);
-    }
 
-    // Clamp last using Min/Max constraints
+    // Clamp after boost application
     if (Min !== undefined && Max !== undefined) {
       val = Math.min(Math.max(val, Min), Max);
     } else if (Min !== undefined) {
@@ -175,21 +169,21 @@ function computePassive(passive, level, opts = {}) {
     };
   }
 
-  // 4) Optional description substitution with formatters
+  // Description substitution
   let description;
   if (renderDescription && passive && typeof passive.Description === "string") {
     description = passive.Description;
-    for (const [fieldName, spec] of Object.entries(states)) {
+    for (const [fieldName] of Object.entries(states)) {
       const token = `<${fieldName}>`;
       if (description.includes(token)) {
         const f = out[fieldName];
-        const formatted = f ? f.formatted : "";
-        description = description.split(token).join(formatted);
+        description = description.split(token).join(f ? f.formatted : "");
       }
     }
   }
 
-  return { fields: out, description, boostFactor, effectiveLevel };
+  // effectiveLevel now means the numeric driver used (weight if provided, else age)
+  return { fields: out, description, boostFactor, effectiveLevel: L_weight };
 
   // Helpers
   function formatField(v, formatter) {
@@ -198,11 +192,7 @@ function computePassive(passive, level, opts = {}) {
     if (formatter === "Percentage") return ((v * 100).toFixed(2)) + "%";
     if (formatter === "Multiplier") return (v.toFixed(2)) + "x";
     if (formatter === "Chance") return (v.toFixed(2)) + "%";
-    
-    // Default: show integers as locale ints, small decimals to 2 places
-    if (Number.isFinite(v) && Math.abs(v - Math.round(v)) < 1e-9) {
-      return Math.round(v).toLocaleString();
-    }
+    if (Math.abs(v - Math.round(v)) < 1e-9) return Math.round(v).toLocaleString();
     return Number(v.toFixed(2)).toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
   function secondsToMMSS(sec) {
@@ -212,6 +202,8 @@ function computePassive(passive, level, opts = {}) {
     return m + ":" + String(r).padStart(2, "0");
   }
 }
+
+
 
 // Weight calculations (spec): weight(L) = baseWeight * (1 + 0.1 * L)
 function weightForward(baseWeight, level) {
@@ -231,7 +223,6 @@ function xpToNext(level, base = 20, exponent = 2.02, maxLevel = 100) {
   if (L >= maxLevel) return 0;
   return Math.round(base * Math.pow(L, exponent));
 }
-
 
 // Get sorted pet list
 function getPetListSorted(filterText = '', sortMode = 'rarity') {
@@ -374,7 +365,10 @@ function renderInfobox(pet) {
   const weightAtLevel = weightForward(baseWeight || 1.5, level);
   const xpNext = xpToNext(level);
   const hungerMax = pet.defaultHunger ?? 30000;
-  const hungerCurrent = hungerMax;
+  
+  const W = (window.storedWeightAtLevel1)
+  ? weightForward(window.storedWeightAtLevel1, level)  // best: exact growth curve
+  : getInternalWeightKg(level, weightInput); 
 
   // Description
   document.getElementById('infoboxDescription').textContent = pet.description || 'No description available.';
@@ -397,12 +391,14 @@ function renderInfobox(pet) {
       }
       
       // Use the new computePassive function with current weight if available
-      const currentWeight = parseFloat(document.getElementById('simWeight')?.value);
       const result = computePassive(passive, level, { 
         mutation, 
         renderDescription: true,
-        currentWeightKg: currentWeight
+        currentWeightKg: W,
+        extraBoosts: getAllExtraBoosts()  
       });
+      
+      
       const desc = result.description || passiveId;
       
       wrap.innerHTML = `<div class="pets-passive-name">${passiveId}</div><div class="pets-passive-desc">${desc}</div>`;
@@ -423,49 +419,6 @@ function renderInfobox(pet) {
     </table>
   `;
   passivesContainer.appendChild(statsBlock);
-}
-
-function updateInfoboxStats(pet) {
-  const statsContainer = document.getElementById('infoboxStats');
-  // Guard: current stats section removed
-  if (!statsContainer) return;
-  const level = parseInt(document.getElementById('simLevel')?.value) || 1;
-  const mutation = getActiveMutation();
-  
-  if (!pet.passives || pet.passives.length === 0) {
-    statsContainer.innerHTML = '<div class="pets-passive-item">No stats available</div>';
-    return;
-  }
-  
-  statsContainer.innerHTML = '';
-  
-  pet.passives.forEach(passiveId => {
-    const passive = Passives[passiveId];
-    if (!passive || !passive.States) return;
-    
-    const passiveEl = document.createElement('div');
-    passiveEl.className = 'pets-passive-item';
-    
-    let statsHtml = `<div class="pets-passive-name">${passiveId}</div>`;
-    statsHtml += '<table class="pets-stats-table">';
-    
-    // Use the new computePassive function with current weight if available
-    const currentWeight = parseFloat(document.getElementById('simWeight')?.value);
-    const result = computePassive(passive, level, { 
-      mutation, 
-      renderDescription: false,
-      currentWeightKg: currentWeight
-    });
-    
-    // Process each computed field
-    Object.entries(result.fields).forEach(([fieldName, fieldData]) => {
-      statsHtml += `<tr><td>${fieldName}</td><td>${fieldData.formatted}</td></tr>`;
-    });
-    
-    statsHtml += '</table>';
-    passiveEl.innerHTML = statsHtml;
-    statsContainer.appendChild(passiveEl);
-  });
 }
 
 function renderSimulate(pet) {
@@ -524,21 +477,26 @@ function renderSimulate(pet) {
 
 function updateSimulateResults(pet) {
   const resultsContainer = document.getElementById('simResultsContent');
-  const level = parseInt(document.getElementById('simLevel')?.value) || 1;
-  const weight = parseFloat(document.getElementById('simWeight')?.value) || 1.5;
+  const level  = parseInt(document.getElementById('simLevel')?.value, 10) || 1;
+  const weightUi = parseFloat(document.getElementById('simWeight')?.value) || 1.5;
   const mutation = getActiveMutation();
-  
-  // Use stored weight at level 1 from Calculate button, or calculate if not available
-  const weightAtLevel1 = window.storedWeightAtLevel1 || weightInverse(weight, level);
-  const weightAtCurrent = weightForward(weightAtLevel1, level);
-  const weightAt100 = weightForward(weightAtLevel1, 100);
-  
-  if (!pet.passives || pet.passives.length === 0) {
+
+  // Use stored base-at-1 if available (set by Calculate); otherwise reconstruct from UI.
+  const weightAtLevel1 = (typeof window.storedWeightAtLevel1 === 'number')
+    ? window.storedWeightAtLevel1
+    : weightInverse(weightUi, level);
+
+  // Full-precision weights (no UI rounding)
+  const weightAtCurrent = weightForward(weightAtLevel1, level);   // ← precise W for this level
+  const weightAt100     = weightForward(weightAtLevel1, 100);
+
+  if (!pet?.passives?.length) {
     resultsContainer.innerHTML = '<div class="pets-passive-item">No passives to simulate</div>';
     return;
   }
-  
+
   let resultsHtml = '';
+
   // Summary card for weights and XP
   const xpNext = xpToNext(level);
   resultsHtml += `<div class="pets-passive-item">`;
@@ -548,47 +506,56 @@ function updateSimulateResults(pet) {
   resultsHtml += `<tr><td>Weight @ level 100</td><td>${formatFixed(weightAt100, 2)} kg</td></tr>`;
   resultsHtml += `<tr><td>XP to next</td><td>${formatNumber(xpNext)}</td></tr>`;
   resultsHtml += '</table></div>';
-  
+
+  // Extra boosts (toys + Σ niho) computed once for this view
+  const extraBoosts = getAllExtraBoosts();
+
   pet.passives.forEach(passiveId => {
     const passive = Passives[passiveId];
     if (!passive || !passive.States) return;
-    
+
     resultsHtml += `<div class="pets-passive-item">`;
     resultsHtml += `<div class="pets-passive-name">${passiveId}</div>`;
     resultsHtml += '<table class="pets-stats-table">';
-    
-    // Use the new computePassive function with current weight if available
-    const result = computePassive(passive, level, { 
-      mutation, 
+
+    // CURRENT result (use precise driver = weightAtCurrent)
+    const result = computePassive(passive, level, {
+      mutation,
       renderDescription: false,
-      currentWeightKg: weight
+      currentWeightKg: weightAtCurrent,
+      extraBoosts
     });
-    const baseResult = mutation !== 'none' ? computePassive(passive, level, { 
-      mutation: 'none', 
-      renderDescription: false,
-      currentWeightKg: weight
-    }) : null;
-    
-    // Process each computed field
+
+    // BASELINE result (same exact weight & extra boosts; mutation = none)
+    const baseResult = mutation !== 'none'
+      ? computePassive(passive, level, {
+          mutation: 'none',
+          renderDescription: false,
+          currentWeightKg: weightAtCurrent,
+          extraBoosts
+        })
+      : null;
+
+    // Render each computed field
     Object.entries(result.fields).forEach(([fieldName, fieldData]) => {
       resultsHtml += `<tr><td>${fieldName}</td><td>${fieldData.formatted}</td></tr>`;
-      
+
       // Show diff vs None if mutation is active
       if (baseResult && baseResult.fields[fieldName]) {
-        const baseValue = baseResult.fields[fieldName].raw;
-        const currentValue = fieldData.raw;
-        if (baseValue !== currentValue && baseValue !== 0) {
+        const baseValue = Number(baseResult.fields[fieldName].raw);
+        const currentValue = Number(fieldData.raw);
+        if (Number.isFinite(baseValue) && Number.isFinite(currentValue) && baseValue !== 0) {
           const diff = currentValue - baseValue;
-          const diffPercent = ((diff / baseValue) * 100).toFixed(1);
-          const diffSign = diff > 0 ? '+' : '';
-          resultsHtml += `<tr><td colspan="2" class="pets-diff-row">${diffSign}${formatNumber(diff)} (${diffSign}${diffPercent}%)</td></tr>`;
+          const diffPercent = (diff / baseValue) * 100;
+          const sign = diff > 0 ? '+' : '';
+          resultsHtml += `<tr><td colspan="2" class="pets-diff-row">${sign}${formatNumber(diff)} (${sign}${diffPercent.toFixed(1)}%)</td></tr>`;
         }
       }
     });
-    
+
     resultsHtml += '</table></div>';
   });
-  
+
   resultsContainer.innerHTML = resultsHtml;
 }
 
@@ -890,6 +857,16 @@ function importSavedPets(event) {
   event.target.value = '';
 }
 
+
+
+
+
+
+
+function getAllExtraBoosts() {
+  return [...getToyExtraBoosts()];
+}
+
 // Event Listeners
 function initEventListeners() {
   // Pet search
@@ -897,145 +874,143 @@ function initEventListeners() {
   if (petSearch) {
     petSearch.addEventListener('input', populatePetSelector);
   }
-  
+
   // Sort controls
   const petSort = document.getElementById('petSort');
   if (petSort) {
     petSort.addEventListener('change', populatePetSelector);
   }
-  
+
   // Simulate controls
   const simLevel = document.getElementById('simLevel');
   const simWeight = document.getElementById('simWeight');
   const ageScale = document.getElementById('ageScale');
   const ageScaleValue = document.getElementById('ageScaleValue');
-  
-  // Age scale bar (primary controller) - updates level/weight inputs
+
+  // Age scale (primary controller) - updates level/weight inputs
   if (ageScale && simLevel && simWeight && ageScaleValue) {
     ageScale.addEventListener('input', () => {
-      const level = parseInt(ageScale.value);
+      const level = parseInt(ageScale.value, 10) || 1;
       ageScaleValue.textContent = level;
-      
+
       // Update level input
       simLevel.value = level;
-      
-      // Only update weight if we have a stored weightAtLevel1 from Calculate
+
+      // Only update weight if we have stored weight@1 from Calculate
       if (window.storedWeightAtLevel1) {
         const newWeight = weightForward(window.storedWeightAtLevel1, level);
         simWeight.value = formatFixed(newWeight, 2);
       }
-      
-      // Update infobox passives, weight table highlighting, and simulate results
+
+      // Update infobox + simulate sections
       const selectedPet = document.querySelector('.pets-pet-tile.selected');
       if (selectedPet) {
-        const petId = selectedPet.dataset.id;
-        const pet = Pets[petId];
+        const pet = Pets[selectedPet.dataset.id];
         if (pet) {
           renderInfobox(pet);
-          renderSimulate(pet); // This updates the weight table highlighting and scrolls to current level
+          renderSimulate(pet);        // updates table highlight & scroll
           updateSimulateResults(pet);
         }
       }
     });
   }
-  
-  // Level input - updates age scale when manually changed
+
+  // Level input -> updates age scale and re-renders
   if (simLevel && ageScale && ageScaleValue) {
     simLevel.addEventListener('input', () => {
       ageScale.value = simLevel.value;
       ageScaleValue.textContent = simLevel.value;
-      
-      // Update infobox with new level
+
       const selectedPet = document.querySelector('.pets-pet-tile.selected');
       if (selectedPet) {
-        const petId = selectedPet.dataset.id;
-        const pet = Pets[petId];
+        const pet = Pets[selectedPet.dataset.id];
         if (pet) {
           renderInfobox(pet);
+          updateSimulateFromControls();
         }
       }
     });
   }
-  
-  // Weight input - updates infobox when changed
+
+  // Weight input -> updates infobox/simulate
   if (simWeight) {
     simWeight.addEventListener('input', () => {
-      // Update infobox with new weight
       const selectedPet = document.querySelector('.pets-pet-tile.selected');
       if (selectedPet) {
-        const petId = selectedPet.dataset.id;
-        const pet = Pets[petId];
+        const pet = Pets[selectedPet.dataset.id];
         if (pet) {
           renderInfobox(pet);
+          updateSimulateFromControls();
         }
       }
     });
   }
-  
+
   // Mutation buttons
   document.querySelectorAll('.pets-mutation-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pets-mutation-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      
-      // Update infobox with new mutation
+
       const selectedPet = document.querySelector('.pets-pet-tile.selected');
       if (selectedPet) {
-        const petId = selectedPet.dataset.id;
-        const pet = Pets[petId];
+        const pet = Pets[selectedPet.dataset.id];
         if (pet) {
           renderInfobox(pet);
         }
       }
-      
       updateSimulateFromControls();
     });
   });
-  
+
+  // Toy buttons (independent toggles)
+  document.querySelectorAll('.pets-toy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+
+      const selectedPet = document.querySelector('.pets-pet-tile.selected');
+      if (selectedPet) {
+        const pet = Pets[selectedPet.dataset.id];
+        if (pet) renderInfobox(pet);
+      }
+      updateSimulateFromControls();
+    });
+  });
+
+
+
   // Calculate button - shows weight table and updates results
   const simRecalc = document.getElementById('simRecalc');
   if (simRecalc) {
     simRecalc.addEventListener('click', () => {
-      // Store the weight at level 1 based on current inputs
-      const currentLevel = parseInt(simLevel?.value) || 1;
+      const currentLevel = parseInt(simLevel?.value, 10) || 1;
       const currentWeight = parseFloat(simWeight?.value) || 1.5;
       window.storedWeightAtLevel1 = weightInverse(currentWeight, currentLevel);
-      
-      // Show the weight table
+
       const weightTableContainer = document.getElementById('weightTableContainer');
-      if (weightTableContainer) {
-        weightTableContainer.style.display = 'block';
-      }
-      
-      // Update infobox with new calculations
+      if (weightTableContainer) weightTableContainer.style.display = 'block';
+
       const selectedPet = document.querySelector('.pets-pet-tile.selected');
       if (selectedPet) {
-        const petId = selectedPet.dataset.id;
-        const pet = Pets[petId];
-        if (pet) {
-          renderInfobox(pet);
-        }
+        const pet = Pets[selectedPet.dataset.id];
+        if (pet) renderInfobox(pet);
       }
-      
-      // Update simulate results
       updateSimulateFromControls();
     });
   }
-  
+
   // Copy URL button
   const copyUrl = document.getElementById('copyUrl');
   if (copyUrl) {
     copyUrl.addEventListener('click', () => {
       navigator.clipboard.writeText(window.location.href).then(() => {
         copyUrl.textContent = 'Copied!';
-        setTimeout(() => {
-          copyUrl.textContent = 'Copy results URL';
-        }, 2000);
+        setTimeout(() => { copyUrl.textContent = 'Copy results URL'; }, 2000);
       });
     });
   }
-  
-  // Save system event listeners
+
+  // Save system
   const saveCurrentBtn = document.getElementById('saveCurrentBtn');
   if (saveCurrentBtn) {
     saveCurrentBtn.addEventListener('click', () => {
@@ -1048,18 +1023,14 @@ function initEventListeners() {
       saveCurrentSetup(name);
     });
   }
-  
+
   const exportSavesBtn = document.getElementById('exportSavesBtn');
-  if (exportSavesBtn) {
-    exportSavesBtn.addEventListener('click', exportSavedPets);
-  }
-  
+  if (exportSavesBtn) exportSavesBtn.addEventListener('click', exportSavedPets);
+
   const importSavesBtn = document.getElementById('importSavesBtn');
   const importFileInput = document.getElementById('importFileInput');
   if (importSavesBtn && importFileInput) {
-    importSavesBtn.addEventListener('click', () => {
-      importFileInput.click();
-    });
+    importSavesBtn.addEventListener('click', () => importFileInput.click());
     importFileInput.addEventListener('change', importSavedPets);
   }
 }
